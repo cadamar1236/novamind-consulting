@@ -1,30 +1,25 @@
 {
-  "app_type": "saas_dashboard",
-  "app_name": "NovaMind Strategy Hub",
-  "tagline": "AI-powered insights for data-driven business strategy",
-  "primary_color": "#1E3A5F",
-  "accent_color": "#00BFA5",
+  "app_type": "crm",
+  "app_name": "NovaStrategy",
+  "tagline": "AI-Powered Market Intelligence for Fortune 500 Consulting",
+  "primary_color": "#1A3A5C",
+  "accent_color": "#00A86B",
   "sections": [
-    "Dashboard",
-    "Projects",
-    "Analytics",
-    "Reports",
-    "Clients",
-    "Settings"
+    "Executive Dashboard",
+    "Client Pipeline",
+    "Market Analysis",
+    "AI Insights Feed"
   ],
   "backend_resources": [
-    "Projects",
-    "Clients",
-    "Reports",
-    "Analytics",
-    "Users",
-    "AIInsights"
+    "clients",
+    "engagements",
+    "ai_reports",
+    "team_members"
   ],
   "features": [
-    "AI-driven market analysis",
-    "Interactive dashboards with real-time KPIs",
-    "Custom report generation",
-    "Client management and collaboration tools",
-    "Data integration with Fortune 500 systems"
+    "AI-driven market entry recommendations",
+    "Real-time KPI tracking per engagement",
+    "Automated client background reports",
+    "Collaborative strategy workspace"
   ]
 }
