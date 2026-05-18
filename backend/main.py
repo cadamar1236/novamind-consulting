@@ -1,14 +1,15 @@
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
 import uvicorn
-import os
 import random
-import uuid
 
-app = FastAPI(title="NovaMind Strategy Hub", version="1.0.0", description="AI-driven business strategy consulting platform for Fortune 500 companies")
+app = FastAPI(title="NovaStrategy", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,361 +20,270 @@ app.add_middleware(
 
 PORT = int(os.environ.get("COMPANY_PORT", 8000))
 
-# ===================== MOCK DATA =====================
+# --- MOCK DATA ---
 
-current_time = datetime.now()
-seven_days_ago = current_time - timedelta(days=7)
+team_members = [
+    {"id": "tm-001", "name": "Dr. Elena Vasquez", "role": "CEO & Chief Strategist", "email": "e.vasquez@novamind.com", "specialization": "Corporate Strategy", "years_experience": 18},
+    {"id": "tm-002", "name": "Marcus Chen", "role": "Head of AI Research", "email": "m.chen@novamind.com", "specialization": "Machine Learning", "years_experience": 12},
+    {"id": "tm-003", "name": "Sarah Okafor", "role": "Senior Consultant", "email": "s.okafor@novamind.com", "specialization": "Market Entry Strategy", "years_experience": 9},
+    {"id": "tm-004", "name": "James Thornton", "role": "Data Analytics Lead", "email": "j.thornton@novamind.com", "specialization": "Data Science", "years_experience": 11},
+    {"id": "tm-005", "name": "Priya Sharma", "role": "AI Solutions Architect", "email": "p.sharma@novamind.com", "specialization": "NLP & Recommendation Systems", "years_experience": 8},
+    {"id": "tm-006", "name": "David Kim", "role": "Junior Consultant", "email": "d.kim@novamind.com", "specialization": "Financial Modeling", "years_experience": 3},
+    {"id": "tm-007", "name": "Aisha Patel", "role": "Client Success Manager", "email": "a.patel@novamind.com", "specialization": "Account Management", "years_experience": 7},
+    {"id": "tm-008", "name": "Liam O'Brien", "role": "Research Analyst", "email": "l.obrien@novamind.com", "specialization": "Competitive Intelligence", "years_experience": 5},
+]
 
 clients = [
-    {"id": "CL-001", "name": "GlobalTech Industries", "industry": "Technology", "revenue": "$45B", "location": "San Francisco, CA", "status": "active", "onboarded": "2024-01-15", "project_count": 3, "ai_insights_usage": 87},
-    {"id": "CL-002", "name": "Pinnacle Healthcare Corp", "industry": "Healthcare", "revenue": "$28B", "location": "Boston, MA", "status": "active", "onboarded": "2024-03-22", "project_count": 2, "ai_insights_usage": 64},
-    {"id": "CL-003", "name": "Apex Financial Services", "industry": "Finance", "revenue": "$62B", "location": "New York, NY", "status": "active", "onboarded": "2024-06-10", "project_count": 4, "ai_insights_usage": 92},
-    {"id": "CL-004", "name": "Meridian Energy Group", "industry": "Energy", "revenue": "$19B", "location": "Houston, TX", "status": "active", "onboarded": "2024-08-05", "project_count": 1, "ai_insights_usage": 45},
-    {"id": "CL-005", "name": "Atlas Manufacturing Co", "industry": "Manufacturing", "revenue": "$33B", "location": "Chicago, IL", "status": "inactive", "onboarded": "2023-11-20", "project_count": 2, "ai_insights_usage": 23},
-    {"id": "CL-006", "name": "Vortex Retail Solutions", "industry": "Retail", "revenue": "$21B", "location": "Seattle, WA", "status": "active", "onboarded": "2024-09-01", "project_count": 3, "ai_insights_usage": 78},
+    {"id": "cli-001", "name": "Aether Global Inc.", "industry": "Technology", "revenue_range": "$10B-$50B", "region": "North America", "status": "active", "contact_email": "contact@aetherglobal.com", "acquisition_date": "2023-03-15", "lifetime_value": 4200000},
+    {"id": "cli-002", "name": "Veridian Financial", "industry": "Financial Services", "revenue_range": "$5B-$20B", "region": "Europe", "status": "active", "contact_email": "info@veridianfin.com", "acquisition_date": "2023-07-01", "lifetime_value": 3800000},
+    {"id": "cli-003", "name": "TerraNova Pharmaceuticals", "industry": "Healthcare", "revenue_range": "$20B-$50B", "region": "North America", "status": "active", "contact_email": "bizdev@terranovapharma.com", "acquisition_date": "2024-01-10", "lifetime_value": 5100000},
+    {"id": "cli-004", "name": "OmniRetail Corp.", "industry": "Retail", "revenue_range": "$5B-$15B", "region": "Asia Pacific", "status": "active", "contact_email": "partnerships@omniretail.asia", "acquisition_date": "2024-04-22", "lifetime_value": 2900000},
+    {"id": "cli-005", "name": "Sapphire Energy", "industry": "Energy", "revenue_range": "$30B-$80B", "region": "Middle East", "status": "active", "contact_email": "strategy@sapphireenergy.ae", "acquisition_date": "2024-06-05", "lifetime_value": 6700000},
+    {"id": "cli-006", "name": "Crestview Manufacturing", "industry": "Manufacturing", "revenue_range": "$2B-$8B", "region": "Europe", "status": "inactive", "contact_email": "info@crestviewmfg.eu", "acquisition_date": "2023-09-18", "lifetime_value": 1800000},
+    {"id": "cli-007", "name": "NexGen Logistics", "industry": "Transportation", "revenue_range": "$1B-$5B", "region": "North America", "status": "active", "contact_email": "hello@nexgenlogistics.com", "acquisition_date": "2025-01-12", "lifetime_value": 2100000},
 ]
 
-projects = [
-    {"id": "PRJ-101", "name": "Market Entry Strategy - APAC", "client": "GlobalTech Industries", "status": "in_progress", "progress": 72, "deadline": "2025-04-15", "team_size": 8, "ai_models_used": 3, "budget": "$850K", "priority": "high"},
-    {"id": "PRJ-102", "name": "Digital Transformation Roadmap", "client": "Pinnacle Healthcare Corp", "status": "completed", "progress": 100, "deadline": "2025-01-20", "team_size": 6, "ai_models_used": 2, "budget": "$1.2M", "priority": "high"},
-    {"id": "PRJ-103", "name": "Risk Assessment & Mitigation", "client": "Apex Financial Services", "status": "in_progress", "progress": 45, "deadline": "2025-06-30", "team_size": 5, "ai_models_used": 4, "budget": "$620K", "priority": "medium"},
-    {"id": "PRJ-104", "name": "Supply Chain Optimization", "client": "Atlas Manufacturing Co", "status": "on_hold", "progress": 30, "deadline": "2025-08-15", "team_size": 4, "ai_models_used": 2, "budget": "$450K", "priority": "low"},
-    {"id": "PRJ-105", "name": "EU Market Penetration Strategy", "client": "Vortex Retail Solutions", "status": "in_progress", "progress": 58, "deadline": "2025-07-10", "team_size": 7, "ai_models_used": 5, "budget": "$980K", "priority": "high"},
-    {"id": "PRJ-106", "name": "Sustainability Framework Design", "client": "Meridian Energy Group", "status": "planning", "progress": 10, "deadline": "2025-09-01", "team_size": 3, "ai_models_used": 1, "budget": "$340K", "priority": "medium"},
+engagements = [
+    {"id": "eng-001", "client_id": "cli-001", "title": "AI-Driven Market Expansion Strategy", "type": "Market Entry", "status": "in_progress", "start_date": "2024-08-01", "end_date": "2025-02-28", "team_lead": "Dr. Elena Vasquez", "team_members": ["Marcus Chen", "Priya Sharma"], "budget": 850000, "hours_billed": 2200, "description": "Develop AI models to identify optimal markets for Aether Global's cloud expansion in Southeast Asia."},
+    {"id": "eng-002", "client_id": "cli-002", "title": "Digital Transformation Roadmap", "type": "Digital Strategy", "status": "in_progress", "start_date": "2024-09-15", "end_date": "2025-06-30", "team_lead": "James Thornton", "team_members": ["Sarah Okafor", "Liam O'Brien"], "budget": 1200000, "hours_billed": 3400, "description": "Create a data-driven digital transformation roadmap for Veridian's retail banking division."},
+    {"id": "eng-003", "client_id": "cli-003", "title": "Competitive Intelligence & Market Positioning", "type": "Competitive Analysis", "status": "completed", "start_date": "2024-03-01", "end_date": "2024-11-30", "team_lead": "Sarah Okafor", "team_members": ["David Kim", "Aisha Patel"], "budget": 650000, "hours_billed": 1800, "description": "Analyzed TerraNova's competitors and recommended repositioning for their oncology pipeline."},
+    {"id": "eng-004", "client_id": "cli-004", "title": "OmniChannel Retail Strategy", "type": "Retail Strategy", "status": "in_progress", "start_date": "2024-11-01", "end_date": "2025-08-31", "team_lead": "Priya Sharma", "team_members": ["Marcus Chen", "Aisha Patel", "Liam O'Brien"], "budget": 1500000, "hours_billed": 4100, "description": "Building a predictive analytics engine to optimize OmniRetail's inventory and personalization."},
+    {"id": "eng-005", "client_id": "cli-005", "title": "Energy Transition Feasibility Study", "type": "Market Entry", "status": "planning", "start_date": "2025-02-01", "end_date": "2025-10-31", "team_lead": "Dr. Elena Vasquez", "team_members": ["James Thornton", "Sarah Okafor"], "budget": 980000, "hours_billed": 500, "description": "Assess feasibility of Sapphire Energy entering renewable hydrogen markets in Europe."},
+    {"id": "eng-006", "client_id": "cli-006", "title": "Supply Chain Optimization", "type": "Operations", "status": "completed", "start_date": "2023-10-01", "end_date": "2024-06-30", "team_lead": "James Thornton", "team_members": ["David Kim"], "budget": 450000, "hours_billed": 1200, "description": "Optimized Crestview's supply chain using AI-driven demand forecasting."},
+    {"id": "eng-007", "client_id": "cli-007", "title": "Last-Mile Delivery AI Optimization", "type": "Operations", "status": "in_progress", "start_date": "2025-01-15", "end_date": "2025-09-30", "team_lead": "Marcus Chen", "team_members": ["Priya Sharma", "Liam O'Brien"], "budget": 720000, "hours_billed": 1600, "description": "Develop AI routing algorithms to reduce NexGen's last-mile delivery costs by 18%."},
+    {"id": "eng-008", "client_id": "cli-001", "title": "Post-Merger Integration Strategy", "type": "M&A Advisory", "status": "planning", "start_date": "2025-03-01", "end_date": "2025-12-31", "team_lead": "Dr. Elena Vasquez", "team_members": ["Aisha Patel", "David Kim"], "budget": 1100000, "hours_billed": 200, "description": "Advise Aether Global on post-merger integration with a recently acquired AI startup."},
 ]
 
-users = [
-    {"id": "USR-001", "name": "Dr. Elena Vasquez", "role": "Senior Strategy Consultant", "email": "e.vasquez@novamind.ai", "projects_active": 3, "expertise": ["AI Strategy", "Market Entry"], "rating": 4.9, "billable_hours": 148},
-    {"id": "USR-002", "name": "Marcus Chen", "role": "Data Scientist", "email": "m.chen@novamind.ai", "projects_active": 2, "expertise": ["Predictive Modeling", "NLP"], "rating": 4.7, "billable_hours": 132},
-    {"id": "USR-003", "name": "Sarah Okafor", "role": "Business Analyst", "email": "s.okafor@novamind.ai", "projects_active": 4, "expertise": ["Financial Analysis", "Risk Assessment"], "rating": 4.8, "billable_hours": 156},
-    {"id": "USR-004", "name": "Dr. Yuki Tanaka", "role": "AI Research Lead", "email": "y.tanaka@novamind.ai", "projects_active": 2, "expertise": ["Generative AI", "Optimization"], "rating": 4.9, "billable_hours": 112},
-    {"id": "USR-005", "name": "Priya Sharma", "role": "Strategy Associate", "email": "p.sharma@novamind.ai", "projects_active": 3, "expertise": ["Competitive Intelligence", "SWOT"], "rating": 4.5, "billable_hours": 98},
+ai_reports = [
+    {"id": "rep-001", "engagement_id": "eng-001", "title": "Southeast Asia Market Attractiveness Index", "report_type": "Market Analysis", "created_date": "2024-10-15", "model_version": "NovaPredict v3.2", "confidence_score": 0.87, "key_findings": ["Vietnam and Indonesia show highest growth potential", "Regulatory barriers moderate in financial services sector", "Recommend phased entry starting Q3 2025"], "data_points": 12500, "file_url": "/reports/rep-001.pdf"},
+    {"id": "rep-002", "engagement_id": "eng-002", "title": "Digital Maturity Assessment", "report_type": "Assessment", "created_date": "2024-11-20", "model_version": "NovaAssess v2.1", "confidence_score": 0.92, "key_findings": ["Veridian scores 67/100 on digital maturity", "Customer analytics gap identified", "AI chatbot deployment could reduce call volume 40%"], "data_points": 8900, "file_url": "/reports/rep-002.pdf"},
+    {"id": "rep-003", "engagement_id": "eng-003", "title": "Oncology Competitive Landscape", "report_type": "Competitive Intelligence", "created_date": "2024-06-10", "model_version": "NovaIntel v4.0", "confidence_score": 0.9, "key_findings": ["Three emerging biotechs threaten TerraNova's pipeline", "Pricing pressure expected from biosimilars by 2027", "Recommend strategic partnerships in immuno-oncology"], "data_points": 18700, "file_url": "/reports/rep-003.pdf"},
+    {"id": "rep-004", "engagement_id": "eng-004", "title": "Customer Segmentation & Personalization Model", "report_type": "Analytics", "created_date": "2025-01-05", "model_version": "NovaSeg v1.5", "confidence_score": 0.84, "key_findings": ["6 distinct customer segments identified", "Loyalty program redesign could lift retention 15%", "Personalized recommendations increase basket size 22%"], "data_points": 35000, "file_url": "/reports/rep-004.pdf"},
+    {"id": "rep-005", "engagement_id": "eng-005", "title": "European Green Hydrogen Market Analysis", "report_type": "Market Analysis", "created_date": "2025-02-28", "model_version": "NovaPredict v3.3", "confidence_score": 0.79, "key_findings": ["Germany and Netherlands lead infrastructure development", "Subsidy landscape favorable for early movers", "ROI breakeven projected at 7-year horizon"], "data_points": 14300, "file_url": "/reports/rep-005.pdf"},
+    {"id": "rep-006", "engagement_id": "eng-007", "title": "Route Optimization Algorithm Performance", "report_type": "Performance Analysis", "created_date": "2025-02-15", "model_version": "NovaRoute v2.0", "confidence_score": 0.91, "key_findings": ["12.4% reduction in delivery time achieved", "Fuel costs decreased by 8.7% in pilot", "Scalability across 500+ routes confirmed"], "data_points": 22000, "file_url": "/reports/rep-006.pdf"},
+    {"id": "rep-007", "engagement_id": "eng-002", "title": "Customer Churn Prediction Model", "report_type": "Predictive Modeling", "created_date": "2024-12-18", "model_version": "NovaChurn v1.0", "confidence_score": 0.88, "key_findings": ["High-risk segment: customers aged 25-35 with 3+ complaints", "Model accuracy 92% on test set", "Proactive retention campaigns could save $18M annually"], "data_points": 42000, "file_url": "/reports/rep-007.pdf"},
 ]
 
-ai_insights = [
-    {"id": "AI-001", "type": "Market Trend Prediction", "client": "GlobalTech Industries", "confidence": 94.2, "impact": "+18% revenue potential", "generated": "2025-02-28", "status": "actionable", "region": "APAC"},
-    {"id": "AI-002", "type": "Competitive Analysis", "client": "Apex Financial Services", "confidence": 89.7, "impact": "3 new market gaps identified", "generated": "2025-03-05", "status": "actionable", "region": "North America"},
-    {"id": "AI-003", "type": "Customer Sentiment Analysis", "client": "Vortex Retail Solutions", "confidence": 91.5, "impact": "NPS improvement of 12 pts", "generated": "2025-03-02", "status": "reviewed", "region": "Europe"},
-    {"id": "AI-004", "type": "Regulatory Risk Forecast", "client": "Meridian Energy Group", "confidence": 86.3, "impact": "4 regulatory changes expected", "generated": "2025-02-25", "status": "actionable", "region": "Global"},
-    {"id": "AI-005", "type": "Optimization Recommendation", "client": "Pinnacle Healthcare Corp", "confidence": 93.8, "impact": "22% cost reduction possible", "generated": "2025-03-07", "status": "actionable", "region": "North America"},
-    {"id": "AI-006", "type": "M&A Opportunity Alert", "client": "Atlas Manufacturing Co", "confidence": 78.4, "impact": "2 acquisition targets identified", "generated": "2025-03-01", "status": "pending", "region": "Europe"},
-    {"id": "AI-007", "type": "Supply Chain Disruption Warning", "client": "GlobalTech Industries", "confidence": 88.9, "impact": "Potential 15% delay risk", "generated": "2025-03-03", "status": "actionable", "region": "APAC"},
-]
+# --- Pydantic Models ---
 
-reports = [
-    {"id": "RPT-001", "title": "Q1 2025 Market Intelligence Brief", "client": "GlobalTech Industries", "type": "quarterly", "pages": 48, "ai_generated": True, "created": "2025-03-01", "downloads": 12},
-    {"id": "RPT-002", "title": "Competitive Landscape Analysis", "client": "Apex Financial Services", "type": "custom", "pages": 32, "ai_generated": True, "created": "2025-02-20", "downloads": 8},
-    {"id": "RPT-003", "title": "Healthcare Digital Maturity Assessment", "client": "Pinnacle Healthcare Corp", "type": "assessment", "pages": 56, "ai_generated": False, "created": "2025-02-15", "downloads": 15},
-    {"id": "RPT-004", "title": "EU Expansion Feasibility Report", "client": "Vortex Retail Solutions", "type": "feasibility", "pages": 44, "ai_generated": True, "created": "2025-03-05", "downloads": 6},
-]
+class ContactCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., max_length=200)
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    title: Optional[str] = None
+    source: Optional[str] = "direct"
 
-analytics = {
-    "total_projects": 6,
-    "active_projects": 4,
-    "completed_projects": 1,
-    "total_clients": 6,
-    "active_clients": 5,
-    "ai_insights_generated": 7,
-    "actionable_insights": 4,
-    "avg_confidence_score": 88.7,
-    "client_satisfaction": 4.8,
-    "revenue_generated": "$4.44M",
-    "team_productivity": 87,
-}
+class ContactUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    title: Optional[str] = None
+    source: Optional[str] = None
 
-# ===================== SCHEMAS =====================
+class DealCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    value: float = Field(..., ge=0)
+    stage: str = Field(..., pattern="^(lead|qualified|proposal|negotiation|closed_won|closed_lost)$")
+    contact_id: str = Field(..., min_length=1)
+    probability: float = Field(..., ge=0.0, le=1.0)
+    expected_close_date: str
 
-class HealthResponse(BaseModel):
-    status: str
-    app: str
-    version: str
+class PipelineStage(BaseModel):
+    stage: str
+    count: int
+    total_value: float
 
-class InfoResponse(BaseModel):
-    name: str
-    tagline: str
-    founded: str
-    team_size: int
-    headquarters: str
-    ai_models_deployed: int
-    fortune_500_clients: int
-    avg_project_completion_time: str
+# --- Endpoints ---
 
-class MetricsResponse(BaseModel):
-    total_projects: int
-    active_projects: int
-    completed_projects: int
-    total_clients: int
-    active_clients: int
-    ai_insights_generated: int
-    actionable_insights: int
-    avg_confidence_score: float
-    client_satisfaction: float
-    revenue_generated: str
-    team_productivity: int
+@app.get("/health")
+def health():
+    return {"status": "ok", "app": "NovaStrategy", "version": "1.0.0"}
 
-class ClientResponse(BaseModel):
-    clients: List[Dict[str, Any]]
-
-class ProjectResponse(BaseModel):
-    projects: List[Dict[str, Any]]
-
-class UserResponse(BaseModel):
-    users: List[Dict[str, Any]]
-
-class AIInsightResponse(BaseModel):
-    insights: List[Dict[str, Any]]
-
-class ReportResponse(BaseModel):
-    reports: List[Dict[str, Any]]
-
-class StatsResponse(BaseModel):
-    total_reports: int
-    total_insights: int
-    active_users: int
-    projects_by_status: Dict[str, int]
-    insights_by_type: Dict[str, int]
-    revenue_to_date: str
-
-class RecentActivityItem(BaseModel):
-    id: str
-    type: str
-    description: str
-    timestamp: str
-    client: Optional[str] = None
-    user: Optional[str] = None
-
-class RecentActivityResponse(BaseModel):
-    activities: List[RecentActivityItem]
-
-class ChartDataPoint(BaseModel):
-    label: str
-    value: float
-    category: Optional[str] = None
-
-class ChartDataResponse(BaseModel):
-    chart_type: str
-    title: str
-    data: List[ChartDataPoint]
-
-class CreateProjectRequest(BaseModel):
-    name: str
-    client: str
-    deadline: str
-    budget: str
-    priority: str = "medium"
-
-class CreateProjectResponse(BaseModel):
-    id: str
-    name: str
-    client: str
-    status: str
-    progress: int
-    deadline: str
-    team_size: int
-    ai_models_used: int
-    budget: str
-    priority: str
-
-# ===================== ENDPOINTS =====================
-
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    return HealthResponse(status="ok", app="NovaMind Strategy Hub", version="1.0.0")
-
-@app.get("/api/info", response_model=InfoResponse)
-async def get_info():
-    return InfoResponse(
-        name="NovaMind Consulting",
-        tagline="Empowering Fortune 500 companies with AI-driven strategic intelligence",
-        founded="2019",
-        team_size=47,
-        headquarters="New York, NY",
-        ai_models_deployed=12,
-        fortune_500_clients=5,
-        avg_project_completion_time="4.2 months"
-    )
-
-@app.get("/api/metrics", response_model=MetricsResponse)
-async def get_metrics():
-    return MetricsResponse(**analytics)
-
-@app.get("/api/clients", response_model=ClientResponse)
-async def get_clients(status: Optional[str] = Query(None, regex="^(active|inactive)$")):
-    if status:
-        filtered = [c for c in clients if c["status"] == status]
-        return ClientResponse(clients=filtered)
-    return ClientResponse(clients=clients)
-
-@app.get("/api/projects", response_model=ProjectResponse)
-async def get_projects(status: Optional[str] = Query(None, regex="^(in_progress|completed|on_hold|planning)$")):
-    if status:
-        filtered = [p for p in projects if p["status"] == status]
-        return ProjectResponse(projects=filtered)
-    return ProjectResponse(projects=projects)
-
-@app.post("/api/projects", response_model=CreateProjectResponse, status_code=201)
-async def create_project(project: CreateProjectRequest):
-    new_id = f"PRJ-{random.randint(107, 200)}"
-    new_project = {
-        "id": new_id,
-        "name": project.name,
-        "client": project.client,
-        "status": "planning",
-        "progress": 0,
-        "deadline": project.deadline,
-        "team_size": random.randint(3, 8),
-        "ai_models_used": random.randint(1, 5),
-        "budget": project.budget,
-        "priority": project.priority
+@app.get("/api/info")
+def api_info():
+    return {
+        "company": "NovaMind Consulting",
+        "app": "NovaStrategy",
+        "tagline": "AI-Powered Strategy for the Fortune 500",
+        "founded": "2019",
+        "headquarters": "San Francisco, CA",
+        "team_size": 48,
+        "clients_served": 18,
+        "avg_engagement_value": 850000,
+        "specialties": ["Market Entry Strategy", "Digital Transformation", "Competitive Intelligence", "AI-Driven Analytics"],
+        "certifications": ["ISO 9001:2023", "SOC 2 Type II", "GDPR Compliant"],
+        "mission": "Empower Fortune 500 companies with data-driven business strategy and market entry recommendations using cutting-edge AI."
     }
-    projects.append(new_project)
-    return CreateProjectResponse(**new_project)
 
-@app.get("/api/users", response_model=UserResponse)
-async def get_users():
-    return UserResponse(users=users)
+@app.get("/api/metrics")
+def api_metrics():
+    return {
+        "active_engagements": 5,
+        "total_clients": 7,
+        "active_clients": 6,
+        "total_revenue_ytd": 5870000,
+        "pipeline_value": 3200000,
+        "avg_client_lifetime_value": 3800000,
+        "ai_reports_generated": 47,
+        "team_utilization_rate": 0.82,
+        "client_satisfaction_score": 4.7,
+        "avg_engagement_duration_days": 245,
+        "repeat_client_rate": 0.71,
+        "quarterly_growth_rate": 0.12
+    }
 
-@app.get("/api/ai-insights", response_model=AIInsightResponse)
-async def get_ai_insights(status: Optional[str] = Query(None, regex="^(actionable|pending|reviewed)$")):
-    if status:
-        filtered = [i for i in ai_insights if i["status"] == status]
-        return AIInsightResponse(insights=filtered)
-    return AIInsightResponse(insights=ai_insights)
+@app.get("/api/contacts")
+def get_contacts():
+    contacts = [
+        {"id": "con-001", "name": "Jennifer Walsh", "email": "j.walsh@aetherglobal.com", "phone": "+1-415-555-0123", "company": "Aether Global Inc.", "title": "VP of Strategy", "source": "referral", "created_date": "2023-02-10", "last_contacted": "2025-01-20"},
+        {"id": "con-002", "name": "Thomas Richter", "email": "t.richter@veridianfin.com", "phone": "+49-30-555-7890", "company": "Veridian Financial", "title": "Chief Digital Officer", "source": "conference", "created_date": "2023-06-14", "last_contacted": "2025-02-05"},
+        {"id": "con-003", "name": "Dr. Lisa Chang", "email": "l.chang@terranovapharma.com", "phone": "+1-617-555-4567", "company": "TerraNova Pharmaceuticals", "title": "Head of Business Development", "source": "linkedin", "created_date": "2023-11-28", "last_contacted": "2025-01-28"},
+        {"id": "con-004", "name": "Kenji Nakamura", "email": "k.nakamura@omniretail.asia", "phone": "+81-3-555-2345", "company": "OmniRetail Corp.", "title": "Director of Innovation", "source": "direct", "created_date": "2024-03-05", "last_contacted": "2025-02-12"},
+        {"id": "con-005", "name": "Fatima Al-Rashid", "email": "f.alrashid@sapphireenergy.ae", "phone": "+971-4-555-6789", "company": "Sapphire Energy", "title": "VP of Corporate Strategy", "source": "referral", "created_date": "2024-05-20", "last_contacted": "2025-02-01"},
+        {"id": "con-006", "name": "Olivia Dupont", "email": "o.dupont@crestviewmfg.eu", "phone": "+33-1-555-3456", "company": "Crestview Manufacturing", "title": "Supply Chain Director", "source": "email_campaign", "created_date": "2023-08-22", "last_contacted": "2024-09-15"},
+        {"id": "con-007", "name": "Michael Torres", "email": "m.torres@nexgenlogistics.com", "phone": "+1-312-555-9012", "company": "NexGen Logistics", "title": "COO", "source": "direct", "created_date": "2024-12-01", "last_contacted": "2025-02-18"},
+        {"id": "con-008", "name": "Dr. Sarah Mitchell", "email": "s.mitchell@innovatebio.com", "phone": "+1-650-555-1111", "company": "InnovateBio", "title": "CEO", "source": "conference", "created_date": "2025-01-15", "last_contacted": "2025-02-10"},
+    ]
+    return {"count": len(contacts), "contacts": contacts}
 
-@app.get("/api/reports", response_model=ReportResponse)
-async def get_reports():
-    return ReportResponse(reports=reports)
+@app.get("/api/deals")
+def get_deals():
+    deals = [
+        {"id": "deal-001", "title": "Aether Global AI Expansion Phase 2", "value": 920000, "stage": "negotiation", "contact_id": "con-001", "contact_name": "Jennifer Walsh", "probability": 0.75, "expected_close_date": "2025-04-30", "created_date": "2025-01-10"},
+        {"id": "deal-002", "title": "Veridian Retail Banking AI Suite", "value": 1450000, "stage": "proposal", "contact_id": "con-002", "contact_name": "Thomas Richter", "probability": 0.6, "expected_close_date": "2025-05-15", "created_date": "2025-02-01"},
+        {"id": "deal-003", "title": "TerraNova Market Entry Europe", "value": 780000, "stage": "lead", "contact_id": "con-003", "contact_name": "Dr. Lisa Chang", "probability": 0.2, "expected_close_date": "2025-07-01", "created_date": "2025-02-12"},
+        {"id": "deal-004", "title": "OmniRetail Supply Chain AI", "value": 1150000, "stage": "qualified", "contact_id": "con-004", "contact_name": "Kenji Nakamura", "probability": 0.45, "expected_close_date": "2025-06-30", "created_date": "2025-01-25"},
+        {"id": "deal-005", "title": "Sapphire Energy Hydrogen Feasibility Phase 2", "value": 1100000, "stage": "proposal", "contact_id": "con-005", "contact_name": "Fatima Al-Rashid", "probability": 0.65, "expected_close_date": "2025-04-01", "created_date": "2025-02-05"},
+        {"id": "deal-006", "title": "NexGen Fleet Optimization Platform", "value": 680000, "stage": "qualified", "contact_id": "con-007", "contact_name": "Michael Torres", "probability": 0.4, "expected_close_date": "2025-08-01", "created_date": "2025-02-20"},
+        {"id": "deal-007", "title": "InnovateBio Launch Strategy Consulting", "value": 350000, "stage": "lead", "contact_id": "con-008", "contact_name": "Dr. Sarah Mitchell", "probability": 0.15, "expected_close_date": "2025-09-01", "created_date": "2025-03-01"},
+        {"id": "deal-008", "title": "Aether Global M&A Advisory Retainer", "value": 2200000, "stage": "lead", "contact_id": "con-001", "contact_name": "Jennifer Walsh", "probability": 0.1, "expected_close_date": "2025-12-31", "created_date": "2025-02-28"},
+    ]
+    return {"count": len(deals), "deals": deals}
 
-@app.get("/api/stats", response_model=StatsResponse)
-async def get_stats():
-    project_statuses = {}
-    for p in projects:
-        s = p["status"]
-        project_statuses[s] = project_statuses.get(s, 0) + 1
-    
-    insight_types = {}
-    for i in ai_insights:
-        t = i["type"]
-        insight_types[t] = insight_types.get(t, 0) + 1
-    
-    return StatsResponse(
-        total_reports=len(reports),
-        total_insights=len(ai_insights),
-        active_users=sum(1 for u in users if u["projects_active"] > 0),
-        projects_by_status=project_statuses,
-        insights_by_type=insight_types,
-        revenue_to_date="$4.44M"
-    )
+@app.get("/api/pipeline")
+def get_pipeline():
+    stages_data = [
+        {"stage": "lead", "count": 3, "total_value": 3330000},
+        {"stage": "qualified", "count": 2, "total_value": 1830000},
+        {"stage": "proposal", "count": 2, "total_value": 2550000},
+        {"stage": "negotiation", "count": 1, "total_value": 920000},
+        {"stage": "closed_won", "count": 0, "total_value": 0},
+        {"stage": "closed_lost", "count": 0, "total_value": 0},
+    ]
+    total_pipeline = sum(s["total_value"] for s in stages_data)
+    return {"stages": stages_data, "total_pipeline_value": total_pipeline, "total_deals": sum(s["count"] for s in stages_data)}
 
-@app.get("/api/recent-activity", response_model=RecentActivityResponse)
-async def get_recent_activity():
+@app.get("/api/clients")
+def get_clients():
+    return {"count": len(clients), "clients": clients}
+
+@app.get("/api/engagements")
+def get_engagements():
+    return {"count": len(engagements), "engagements": engagements}
+
+@app.get("/api/engagements/{engagement_id}")
+def get_engagement(engagement_id: str):
+    for eng in engagements:
+        if eng["id"] == engagement_id:
+            return eng
+    raise HTTPException(status_code=404, detail="Engagement not found")
+
+@app.get("/api/ai-reports")
+def get_ai_reports():
+    return {"count": len(ai_reports), "reports": ai_reports}
+
+@app.get("/api/ai-reports/{report_id}")
+def get_ai_report(report_id: str):
+    for rep in ai_reports:
+        if rep["id"] == report_id:
+            return rep
+    raise HTTPException(status_code=404, detail="Report not found")
+
+@app.get("/api/team-members")
+def get_team_members():
+    return {"count": len(team_members), "team_members": team_members}
+
+@app.post("/api/contacts")
+def create_contact(contact: ContactCreate):
+    new_contact = contact.model_dump()
+    new_contact["id"] = f"con-{uuid.uuid4().hex[:8]}"
+    new_contact["created_date"] = datetime.now().strftime("%Y-%m-%d")
+    new_contact["last_contacted"] = datetime.now().strftime("%Y-%m-%d")
+    contacts_list = [c for c in get_contacts()["contacts"]] if False else []
+    return {"message": "Contact created", "contact": new_contact}
+
+@app.put("/api/contacts/{contact_id}")
+def update_contact(contact_id: str, contact: ContactUpdate):
+    return {"message": "Contact updated", "contact_id": contact_id, "updated_fields": contact.model_dump(exclude_none=True)}
+
+@app.post("/api/deals")
+def create_deal(deal: DealCreate):
+    new_deal = deal.model_dump()
+    new_deal["id"] = f"deal-{uuid.uuid4().hex[:8]}"
+    new_deal["created_date"] = datetime.now().strftime("%Y-%m-%d")
+    return {"message": "Deal created", "deal": new_deal}
+
+@app.get("/api/stats")
+def get_stats():
+    active_engagements_budget = sum(e["budget"] for e in engagements if e["status"] == "in_progress")
+    completed_engagements = sum(1 for e in engagements if e["status"] == "completed")
+    total_hours = sum(e["hours_billed"] for e in engagements)
+    avg_hours_per_engagement = round(total_hours / len(engagements), 1) if engagements else 0
+    return {
+        "active_engagements_count": sum(1 for e in engagements if e["status"] in ["in_progress", "planning"]),
+        "completed_engagements_count": completed_engagements,
+        "active_budget_total": active_engagements_budget,
+        "total_hours_billed": total_hours,
+        "avg_hours_per_engagement": avg_hours_per_engagement,
+        "reports_generated": len(ai_reports),
+        "avg_report_confidence": round(sum(r["confidence_score"] for r in ai_reports) / len(ai_reports), 2),
+        "team_size": len(team_members)
+    }
+
+@app.get("/api/recent-activity")
+def get_recent_activity():
     activities = [
-        RecentActivityItem(id="ACT-001", type="insight", description="AI Insight #AI-001 generated for GlobalTech Industries - Market Trend Prediction", timestamp="2025-03-07T10:30:00Z", client="GlobalTech Industries", user="Dr. Yuki Tanaka"),
-        RecentActivityItem(id="ACT-002", type="project", description="Project PRJ-105 progress updated to 58% - EU Market Penetration", timestamp="2025-03-07T09:15:00Z", client="Vortex Retail Solutions", user="Priya Sharma"),
-        RecentActivityItem(id="ACT-003", type="report", description="Report RPT-004 'EU Expansion Feasibility Report' published", timestamp="2025-03-05T14:00:00Z", client="Vortex Retail Solutions", user="Dr. Elena Vasquez"),
-        RecentActivityItem(id="ACT-004", type="client", description="New client onboarded: Vortex Retail Solutions", timestamp="2025-03-01T08:00:00Z", client="Vortex Retail Solutions", user="Sarah Okafor"),
-        RecentActivityItem(id="ACT-005", type="insight", description="AI Insight #AI-003 reviewed by client - Customer Sentiment Analysis", timestamp="2025-03-02T16:45:00Z", client="Vortex Retail Solutions", user="Marcus Chen"),
-        RecentActivityItem(id="ACT-006", type="project", description="Project PRJ-102 completed - Digital Transformation Roadmap", timestamp="2025-01-20T12:00:00Z", client="Pinnacle Healthcare Corp", user="Dr. Elena Vasquez"),
-        RecentActivityItem(id="ACT-007", type="milestone", description="Team reached 85% productivity milestone for Q1", timestamp="2025-03-06T11:30:00Z"),
-        RecentActivityItem(id="ACT-008", type="insight", description="AI Insight #AI-007 generated for GlobalTech Industries - Supply Chain Disruption Warning", timestamp="2025-03-03T09:00:00Z", client="GlobalTech Industries", user="Dr. Yuki Tanaka"),
+        {"type": "report_generated", "description": "Route Optimization Algorithm Performance report completed for NexGen Logistics", "timestamp": "2025-02-15T14:30:00Z", "user": "Marcus Chen", "engagement_id": "eng-007"},
+        {"type": "deal_created", "description": "New deal: InnovateBio Launch Strategy Consulting ($350,000)", "timestamp": "2025-03-01T09:15:00Z", "user": "Sarah Okafor", "deal_id": "deal-007"},
+        {"type": "engagement_status", "description": "Sapphire Energy feasibility study moved to planning phase", "timestamp": "2025-02-25T11:00:00Z", "user": "Dr. Elena Vasquez", "engagement_id": "eng-005"},
+        {"type": "contact_added", "description": "New contact: Dr. Sarah Mitchell (CEO, InnovateBio)", "timestamp": "2025-01-15T16:45:00Z", "user": "Aisha Patel", "contact_id": "con-008"},
+        {"type": "report_generated", "description": "European Green Hydrogen Market Analysis report completed for Sapphire Energy", "timestamp": "2025-02-28T13:00:00Z", "user": "James Thornton", "engagement_id": "eng-005"},
+        {"type": "deal_stage_change", "description": "Aether Global AI Expansion Phase 2 moved to negotiation stage", "timestamp": "2025-02-20T10:30:00Z", "user": "Aisha Patel", "deal_id": "deal-001"},
+        {"type": "engagement_milestone", "description": "OmniRetail project: Customer segmentation model delivered ahead of schedule", "timestamp": "2025-01-05T15:00:00Z", "user": "Priya Sharma", "engagement_id": "eng-004"},
+        {"type": "team_update", "description": "Liam O'Brien joined OmniRetail engagement team", "timestamp": "2025-02-10T08:00:00Z", "user": "Dr. Elena Vasquez", "engagement_id": "eng-004"},
     ]
-    return RecentActivityResponse(activities=activities)
+    return {"activities": activities}
 
-@app.get("/api/chart-data", response_model=List[ChartDataResponse])
-async def get_chart_data():
-    return [
-        ChartDataResponse(
-            chart_type="bar",
-            title="Project Progress by Client",
-            data=[
-                ChartDataPoint(label="GlobalTech Industries", value=72, category="APAC Market Entry"),
-                ChartDataPoint(label="Pinnacle Healthcare", value=100, category="Digital Transformation"),
-                ChartDataPoint(label="Apex Financial", value=45, category="Risk Assessment"),
-                ChartDataPoint(label="Atlas Manufacturing", value=30, category="Supply Chain"),
-                ChartDataPoint(label="Vortex Retail", value=58, category="EU Market Expansion"),
-                ChartDataPoint(label="Meridian Energy", value=10, category="Sustainability Design"),
-            ]
-        ),
-        ChartDataResponse(
-            chart_type="line",
-            title="AI Confidence Score Trend",
-            data=[
-                ChartDataPoint(label="Feb 15", value=86.3),
-                ChartDataPoint(label="Feb 20", value=88.9),
-                ChartDataPoint(label="Feb 25", value=91.2),
-                ChartDataPoint(label="Mar 01", value=89.7),
-                ChartDataPoint(label="Mar 05", value=93.8),
-                ChartDataPoint(label="Mar 07", value=94.2),
-            ]
-        ),
-        ChartDataResponse(
-            chart_type="pie",
-            title="Insights by Status",
-            data=[
-                ChartDataPoint(label="Actionable", value=4, category="active"),
-                ChartDataPoint(label="Pending", value=1, category="pending"),
-                ChartDataPoint(label="Reviewed", value=2, category="reviewed"),
-            ]
-        ),
-        ChartDataResponse(
-            chart_type="doughnut",
-            title="Revenue Distribution by Client",
-            data=[
-                ChartDataPoint(label="GlobalTech", value=1.2, category="$1.2M"),
-                ChartDataPoint(label="Apex Financial", value=0.85, category="$850K"),
-                ChartDataPoint(label="Pinnacle Healthcare", value=0.98, category="$980K"),
-                ChartDataPoint(label="Vortex Retail", value=0.62, category="$620K"),
-                ChartDataPoint(label="Meridian Energy", value=0.45, category="$450K"),
-                ChartDataPoint(label="Atlas Manufacturing", value=0.34, category="$340K"),
-            ]
-        ),
+@app.get("/api/chart-data")
+def get_chart_data():
+    monthly_revenue = [
+        {"month": "2024-09", "revenue": 420000, "new_clients": 1},
+        {"month": "2024-10", "revenue": 510000, "new_clients": 0},
+        {"month": "2024-11", "revenue": 480000, "new_clients": 1},
+        {"month": "2024-12", "revenue": 550000, "new_clients": 0},
+        {"month": "2025-01", "revenue": 680000, "new_clients": 2},
+        {"month": "2025-02", "revenue": 720000, "new_clients": 1},
     ]
-
-@app.get("/api/project/{project_id}")
-async def get_project_detail(project_id: str):
-    for project in projects:
-        if project["id"] == project_id:
-            # Return with more detailed mock data
-            return {
-                **project,
-                "description": f"Strategic initiative for {project['client']} focusing on {project['name'].lower()}.",
-                "key_risks": ["Market volatility", "Regulatory changes", "Competitive response"],
-                "ai_recommendations": [
-                    {"type": "entry_strategy", "confidence": 92.4, "description": "Phased market entry recommended"},
-                    {"type": "partnership", "confidence": 87.1, "description": "Identify local strategic partners"},
-                ],
-                "team_members": [u for u in users if u["projects_active"] > 0][:3],
-                "start_date": "2025-01-10",
-                "last_updated": "2025-03-07",
-            }
-    raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-
-@app.post("/api/ai-insights/generate", status_code=201)
-async def generate_ai_insight(client_id: str = Query(..., description="Client ID to generate insight for")):
-    client_match = None
-    for c in clients:
-        if c["id"] == client_id:
-            client_match = c
-            break
-    
-    if not client_match:
-        raise HTTPException(status_code=404, detail=f"Client {client_id} not found")
-    
-    insight_types = ["Market Trend Prediction", "Competitive Analysis", "Customer Sentiment Analysis", "Regulatory Risk Forecast", "Optimization Recommendation", "M&A Opportunity Alert", "Supply Chain Disruption Warning"]
-    regions = ["North America", "APAC", "Europe", "Global"]
-    
-    new_insight = {
-        "id": f"AI-{random.randint(8, 99):03d}",
-        "type": random.choice(insight_types),
-        "client": client_match["name"],
-        "confidence": round(random.uniform(75.0, 98.0), 1),
-        "impact": f"+{random.randint(5, 30)}% efficiency potential",
-        "generated": current_time.strftime("%Y-%m-%d"),
-        "status": random.choice(["actionable", "pending"]),
-        "region": random.choice(regions)
+    engagement_status_distribution = {
+        "in_progress": 4,
+        "planning": 2,
+        "completed": 2,
     }
-    ai_insights.append(new_insight)
-    return new_insight
+    report_types = {
+        "Market Analysis": 2,
+        "Competitive Intelligence": 1,
+        "Predictive Modeling": 1,
+        "Assessment": 1,
+        "Analytics": 1,
+        "Performance Analysis": 1,
+    }
+    return {
+        "monthly_revenue": monthly_revenue,
+        "engagement_status_distribution": engagement_status_distribution,
+        "report_types": report_types
+    }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
