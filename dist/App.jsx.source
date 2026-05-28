@@ -1,8 +1,31 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { BarChart3, TrendingUp, Users, Target, Bell, Search, Download, Plus, Settings, LayoutDashboard, PieChart, FileText, ChevronDown, User, LogOut, Clock, CheckCircle, AlertCircle, ArrowUp, ArrowDown, Activity, Menu, X } from 'lucide-react';
+```jsx
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  SearchPanel,
+  PlusPanel,
+  UsersPanel,
+  DollarSign,
+  TargetPanel,
+  ActivityPanel,
+  FileTextPanel,
+  FilterPanel,
+  SortAsc,
+  SortDesc,
+  DownloadPanel,
+  CheckCirclePanel,
+  PhonePanel,
+  MailPanel,
+  CalendarPanel,
+  MessageSquarePanel,
+  ChevronRightPanel,
+  ClockPanel,
+  Building2,
+  TrendingUpPanel,
+  BarChart3Panel,
+  XPanel,
+} from 'lucide-react';
 
 const BASE = window.__BACKEND_URL__ || '';
-
 async function apiFetch(path, opts = {}) {
   for (let i = 0; i < 5; i++) {
     try {
@@ -14,634 +37,610 @@ async function apiFetch(path, opts = {}) {
   return null;
 }
 
-function CSSInjection() {
+const MOCK_CONTACTS = [
+  { id: 1, name: 'Sarah Chen', company: 'TechGlobal Inc', status: 'Active', lastContact: '2024-01-15', email: 'sarah@techglobal.com', phone: '+1-555-0123', owner: 'Alex M' },
+  { id: 2, name: 'Marcus Johnson', company: 'Apex Ventures', status: 'Lead', lastContact: '2024-01-12', email: 'marcus@apex.com', phone: '+1-555-0124', owner: 'Julia R' },
+  { id: 3, name: 'Emily Rodriguez', company: 'Summit Corp', status: 'Active', lastContact: '2024-01-10', email: 'emily@summitcorp.com', phone: '+1-555-0125', owner: 'Alex M' },
+  { id: 4, name: 'David Kim', company: 'Horizon Group', status: 'Inactive', lastContact: '2023-12-20', email: 'david@horizon.com', phone: '+1-555-0126', owner: 'Tom W' },
+  { id: 5, name: 'Lisa Thompson', company: 'NexGen Solutions', status: 'Active', lastContact: '2024-01-14', email: 'lisa@nexgen.com', phone: '+1-555-0127', owner: 'Julia R' },
+];
+
+const MOCK_DEALS = [
+  { id: 1, name: 'Enterprise SaaS Platform', company: 'TechGlobal Inc', value: 450000, stage: 'Won', owner: 'Alex M', probability: 100, nextAction: 'Contract signing' },
+  { id: 2, name: 'AI Consulting Package', company: 'Apex Ventures', value: 280000, stage: 'Proposal', owner: 'Julia R', probability: 75, nextAction: 'Send proposal' },
+  { id: 3, name: 'Market Entry Strategy', company: 'Summit Corp', value: 320000, stage: 'Qualified', owner: 'Alex M', probability: 50, nextAction: 'Discovery call' },
+  { id: 4, name: 'Data Analytics Suite', company: 'Horizon Group', value: 180000, stage: 'Lead', owner: 'Tom W', probability: 25, nextAction: 'Initial outreach' },
+  { id: 5, name: 'Digital Transformation', company: 'NexGen Solutions', value: 550000, stage: 'Proposal', owner: 'Julia R', probability: 80, nextAction: 'Negotiation' },
+  { id: 6, name: 'Cloud Migration', company: 'TechGlobal Inc', value: 380000, stage: 'Qualified', owner: 'Alex M', probability: 60, nextAction: 'Technical demo' },
+  { id: 7, name: 'AI Automation', company: 'Apex Ventures', value: 220000, stage: 'Lead', owner: 'Julia R', probability: 30, nextAction: 'Follow-up email' },
+];
+
+const MOCK_ACTIVITIES = [
+  { id: 1, type: 'call', description: 'Discovery call with Sarah Chen', date: '2024-01-15 14:30', duration: '45 min', contact: 'Sarah Chen' },
+  { id: 2, type: 'email', description: 'Sent proposal to Marcus Johnson', date: '2024-01-14 11:00', contact: 'Marcus Johnson' },
+  { id: 3, type: 'meeting', description: 'Strategy workshop with TechGlobal', date: '2024-01-13 10:00', duration: '2 hours', contact: 'Sarah Chen' },
+  { id: 4, type: 'call', description: 'Follow-up with Emily Rodriguez', date: '2024-01-12 15:00', duration: '30 min', contact: 'Emily Rodriguez' },
+  { id: 5, type: 'email', description: 'Contract sent to Lisa Thompson', date: '2024-01-11 09:30', contact: 'Lisa Thompson' },
+];
+
+const PIPELINE_COLUMNS = ['Lead', 'Qualified', 'Proposal', 'Won'];
+
+function useCSS() {
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      :root {
-        --accent: #1E3A5F;
-        --accent2: #00BFA5;
-      }
+      :root { --accent: #00B4D8; --accent2: #1A3A5C; }
       .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
-      .gradient-text { background: linear-gradient(135deg, #1E3A5F, #00BFA5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+      .gradient-text { background: linear-gradient(135deg, #00B4D8, #1A3A5C, #6366F1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
       .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
       @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
       @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
       .fade-in { animation: fadeIn 0.3s ease forwards; }
-      @keyframes countUp { from { opacity: 0; } to { opacity: 1; } }
-      .count-up { animation: countUp 0.6s ease forwards; }
-      .scrollbar-custom::-webkit-scrollbar { width: 4px; }
-      .scrollbar-custom::-webkit-scrollbar-track { background: transparent; }
-      .scrollbar-custom::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+      .kanban-card { transition: transform 0.2s, box-shadow 0.2s; }
+      .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,180,216,0.1); }
+      .modal-overlay { background: rgba(6,8,15,0.8); backdrop-filter: blur(8px); }
     `;
     document.head.appendChild(style);
     return () => style.remove();
   }, []);
-  return null;
 }
 
-function Sidebar({ activePage, setActivePage, isOpen, setIsOpen }) {
+function Sidebar({ activeTab, setActiveTab, setShowNewContact, setShowNewDeal }) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'contacts', label: 'Contacts', icon: UsersPanel },
+    { id: 'deals', label: 'Deals', icon: DollarSign },
+    { id: 'pipeline', label: 'Pipeline', icon: TargetPanel },
+    { id: 'activities', label: 'Activities', icon: ActivityPanel },
+    { id: 'reports', label: 'Reports', icon: BarChart3Panel },
   ];
 
   return (
-    <>
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsOpen(false)} />
-      )}
-      <aside className={`w-64 flex-shrink-0 flex flex-col border-r border-white/5 bg-white/[0.02] h-full transition-transform duration-300 z-50 fixed lg:relative ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="p-6 border-b border-white/5 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1E3A5F, #00BFA5)' }}>
-            <PieChart className="w-5 h-5 text-white" />
+    <aside className="w-64 flex-shrink-0 flex flex-col border-r border-white/5 bg-white/[0.02] h-full">
+      <div className="p-6 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center">
+            <TargetPanel size={20} className="text-white" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-slate-100">NovaMind</div>
-            <div className="text-xs text-slate-400">Strategy Hub</div>
+            <h1 className="text-lg font-bold gradient-text">NovaMind Insights</h1>
+            <p className="text-xs text-slate-400 mt-0.5">AI-Powered CRM</p>
           </div>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          {(navItems || []).map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => { setActivePage(id); setIsOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                activePage === id
-                  ? 'bg-white/10 text-slate-100 border border-white/10'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#00BFA5] flex items-center justify-center text-xs font-bold">
-              JD
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm text-slate-200 truncate">John Davis</div>
-              <div className="text-xs text-slate-400">Strategy Director</div>
-            </div>
-            <button className="text-slate-400 hover:text-slate-200 transition-colors">
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
-    </>
+      </div>
+      <nav className="flex-1 p-4 space-y-1">
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+              activeTab === item.id
+                ? 'bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <item.icon size={18} />
+            <span className="text-sm font-medium">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="p-4 border-t border-white/5 space-y-2">
+        <button
+          onClick={() => setShowNewContact(true)}
+          className="w-full flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium transition-all duration-200 hover:shadow-lg"
+        >
+          <PlusPanel size={16} /> New Contact
+        </button>
+        <button
+          onClick={() => setShowNewDeal(true)}
+          className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all duration-200"
+        >
+          <PlusPanel size={16} /> New Deal
+        </button>
+      </div>
+    </aside>
   );
 }
 
-function TopBar({ menuOpen, setMenuOpen }) {
-  const [showNotif, setShowNotif] = useState(false);
-  const notifRef = useRef(null);
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
+function TopBar({ title }) {
   return (
-    <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0 bg-[#06080f]/80 backdrop-blur-lg">
+    <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0">
+      <h2 className="text-lg font-semibold">{title}</h2>
       <div className="flex items-center gap-4">
-        <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden text-slate-400 hover:text-slate-200">
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <SearchPanel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search insights..."
-            className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00BFA5]/50 w-64"
+            placeholder="SearchPanel anything..."
+            className="w-64 pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all duration-200"
           />
-        </div>
-      </div>
-      <div className="flex items-center gap-4">
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-sm hover:bg-white/10 transition-all">
-          <Download className="w-4 h-4" />
-          Export
-        </button>
-        <div className="relative" ref={notifRef}>
-          <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00BFA5] animate-pulse" />
-          </button>
-          {showNotif && (
-            <div className="absolute right-0 top-full mt-2 w-72 glass p-3 space-y-2 fade-in">
-              <div className="text-xs text-slate-400 font-medium">Notifications</div>
-              <div className="text-sm text-slate-300 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-[#00BFA5]" /> New market report ready
-              </div>
-              <div className="text-sm text-slate-300 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-400" /> AI analysis complete
-              </div>
-              <div className="text-sm text-slate-300 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-400" /> Strategy session in 1h
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#00BFA5] flex items-center justify-center text-xs font-bold cursor-pointer">
-          JD
         </div>
       </div>
     </header>
   );
 }
 
-function KPICard({ icon: Icon, label, value, delta, trend, delay }) {
-  const [count, setCount] = useState(0);
-  const animRef = useRef(null);
-
-  useEffect(() => {
-    const numericValue = parseInt(value.replace(/[^0-9]/g, ''));
-    if (isNaN(numericValue)) { setCount(value); return; }
-    
-    const duration = 1200;
-    const steps = 30;
-    const increment = numericValue / steps;
-    let current = 0;
-    const prefix = value.startsWith('$') ? '$' : '';
-    
-    let i = 0;
-    animRef.current = setInterval(() => {
-      i++;
-      if (i >= steps) {
-        setCount(prefix + numericValue.toLocaleString());
-        clearInterval(animRef.current);
-      } else {
-        current += increment;
-        setCount(prefix + Math.round(current).toLocaleString());
-      }
-    }, duration / steps);
-
-    return () => clearInterval(animRef.current);
-  }, [value]);
-
+function KPICard({ icon: Icon, label, value, delta, trend }) {
   return (
-    <div className="glass p-5 fade-in" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2 rounded-lg bg-white/5">
-          <Icon className="w-5 h-5 text-[#00BFA5]" />
+    <div className="glass p-5 fade-in">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-10 h-10 rounded-lg bg-[#00B4D8]/10 flex items-center justify-center">
+          <Icon size={20} className="text-[#00B4D8]" />
         </div>
-        {delta !== undefined && (
-          <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-            trend === 'up' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+        {delta && (
+          <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+            trend === 'up' ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'
           }`}>
-            {trend === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-            {delta}%
-          </div>
+            {trend === 'up' ? <TrendingUpPanel size={12} /> : <TrendingUpPanel size={12} className="rotate-180" />}
+            {delta}
+          </span>
         )}
       </div>
-      <div className="text-2xl font-bold text-slate-100 mb-1 count-up">{count}</div>
-      <div className="text-xs text-slate-400">{label}</div>
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
     </div>
   );
 }
 
-function LineChart({ data, height = 200 }) {
-  const width = 600;
-  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const [animate, setAnimate] = useState(false);
+function ContactsTable({ contacts, searchTerm, onSort, sortConfig }) {
+  const filtered = useMemo(() => {
+    if (!searchTerm) return contacts;
+    return contacts.filter(c =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.company.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [contacts, searchTerm]);
 
-  useEffect(() => {
-    setTimeout(() => setAnimate(true), 300);
-  }, []);
-
-  const maxVal = Math.max(...(data || []).map(d => d.value));
-  const minVal = Math.min(...(data || []).map(d => d.value));
-  const range = maxVal - minVal || 1;
-
-  const points = (data || []).map((d, i) => {
-    const x = padding.left + (i / (data.length - 1)) * chartWidth;
-    const y = padding.top + chartHeight - ((d.value - minVal) / range) * chartHeight;
-    return `${x},${y}`;
-  }).join(' ');
-
-  const areaPoints = (data || []).map((d, i) => {
-    const x = padding.left + (i / (data.length - 1)) * chartWidth;
-    const y = padding.top + chartHeight - ((d.value - minVal) / range) * chartHeight;
-    return `${x},${y}`;
-  }).join(' ') + ` ${padding.left + chartWidth},${padding.top + chartHeight} ${padding.left},${padding.top + chartHeight}`;
-
-  const yLabels = [];
-  for (let i = 0; i <= 4; i++) {
-    yLabels.push(Math.round(minVal + (range * i) / 4));
-  }
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
-      <defs>
-        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#00BFA5" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#00BFA5" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      
-      {yLabels.map((label, i) => {
-        const y = padding.top + chartHeight - (i / 4) * chartHeight;
-        return (
-          <g key={i}>
-            <line x1={padding.left} y1={y} x2={padding.left + chartWidth} y2={y} stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
-            <text x={padding.left - 8} y={y + 4} textAnchor="end" className="text-[10px] fill-slate-500">{label}</text>
-          </g>
-        );
-      })}
-
-      {(data || []).map((d, i) => {
-        const x = padding.left + (i / (data.length - 1)) * chartWidth;
-        return (
-          <text key={i} x={x} y={height - 8} textAnchor="middle" className="text-[10px] fill-slate-500">{d.label}</text>
-        );
-      })}
-
-      <polygon
-        points={areaPoints}
-        fill="url(#lineGrad)"
-        className="transition-all duration-1000"
-        style={{ opacity: animate ? 1 : 0 }}
-      />
-      
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#00BFA5"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="transition-all duration-1000"
-        style={{ opacity: animate ? 1 : 0 }}
-      />
-
-      {(data || []).map((d, i) => {
-        const x = padding.left + (i / (data.length - 1)) * chartWidth;
-        const y = padding.top + chartHeight - ((d.value - minVal) / range) * chartHeight;
-        return (
-          <circle
-            key={i}
-            cx={x}
-            cy={y}
-            r="4"
-            fill="#00BFA5"
-            stroke="#06080f"
-            strokeWidth="2"
-            className="transition-all duration-500"
-            style={{ opacity: animate ? 1 : 0, transitionDelay: `${i * 100}ms` }}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-function BarChart({ data }) {
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => setTimeout(() => setAnimate(true), 500), []);
-
-  const maxVal = Math.max(...(data || []).map(d => d.value));
-  const barWidth = 40;
-
-  return (
-    <div className="flex items-end justify-around h-48 gap-2 pb-8 relative">
-      {(data || []).map((d, i) => {
-        const heightPct = (d.value / maxVal) * 100;
-        return (
-          <div key={i} className="flex flex-col items-center gap-1 flex-1">
-            <div className="w-full flex justify-center items-end h-40">
-              <div
-                className="w-8 rounded-t-md transition-all duration-1000 ease-out"
-                style={{
-                  height: animate ? `${heightPct}%` : '0%',
-                  background: `linear-gradient(180deg, #00BFA5, #1E3A5F)`,
-                  opacity: animate ? 0.8 : 0,
-                  transitionDelay: `${i * 100}ms`
-                }}
-              />
-            </div>
-            <span className="text-[10px] text-slate-400 absolute bottom-0">{d.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function DataTable({ data, columns }) {
-  const [sortField, setSortField] = useState(null);
-  const [sortDir, setSortDir] = useState('asc');
-
-  const sortedData = useMemo(() => {
-    if (!sortField) return data || [];
-    return [...(data || [])].sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
-      if (typeof aVal === 'string') {
-        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+  const sorted = useMemo(() => {
+    if (!sortConfig.key) return filtered;
+    return [...filtered].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [data, sortField, sortDir]);
+  }, [filtered, sortConfig]);
 
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDir('asc');
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Active': return 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20';
+      case 'Lead': return 'bg-amber-400/10 text-amber-400 border-amber-400/20';
+      case 'Inactive': return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
+      default: return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
     }
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-white/5">
-            {(columns || []).map(col => (
-              <th
-                key={col.key}
-                onClick={() => col.sortable !== false && handleSort(col.key)}
-                className={`text-left text-xs font-medium text-slate-400 px-3 py-3 ${col.sortable !== false ? 'cursor-pointer hover:text-slate-200' : ''}`}
-              >
-                <div className="flex items-center gap-1">
-                  {col.label}
-                  {sortField === col.key && (
-                    <span className="text-[#00BFA5]">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(sortedData || []).map((row, i) => (
-            <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              {(columns || []).map(col => (
-                <td key={col.key} className="px-3 py-3 text-sm text-slate-300">
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
+    <div className="glass overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/5">
+              {['name', 'company', 'status', 'lastContact', 'owner'].map(col => (
+                <th
+                  key={col}
+                  onClick={() => onSort(col)}
+                  className="text-left px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    {col === 'name' ? 'Name' : col === 'company' ? 'Company' : col === 'status' ? 'Status' : col === 'lastContact' ? 'Last Contact' : 'Owner'}
+                    {sortConfig.key === col && (
+                      sortConfig.direction === 'asc' ? <SortAsc size={12} /> : <SortDesc size={12} />
+                    )}
+                  </div>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(sorted || []).map((contact, idx) => (
+              <tr
+                key={contact.id}
+                className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer fade-in"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center text-xs font-medium">
+                      {contact.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">{contact.name}</p>
+                      <p className="text-xs text-slate-400">{contact.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={14} className="text-slate-500" />
+                    <span className="text-sm text-slate-300">{contact.company}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs px-2.5 py-1 rounded-full border ${getStatusColor(contact.status)}`}>
+                    {contact.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-400">{contact.lastContact}</td>
+                <td className="px-4 py-3 text-sm text-slate-400">{contact.owner}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function QuickActions() {
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ client: '', market: '', type: 'analysis' });
-  const [toast, setToast] = useState(null);
+function KanbanBoard({ deals, onSelectDeal }) {
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '400px' }}>
+      {PIPELINE_COLUMNS.map((column, colIdx) => {
+        const columnDeals = (deals || []).filter(d => d.stage === column);
+        return (
+          <div key={column} className="flex-1 min-w-[280px]">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  column === 'Lead' ? 'bg-slate-400' :
+                  column === 'Qualified' ? 'bg-amber-400' :
+                  column === 'Proposal' ? 'bg-blue-400' : 'bg-emerald-400'
+                }`} />
+                <span className="text-sm font-medium text-slate-300">{column}</span>
+                <span className="text-xs text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">{columnDeals.length}</span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {(columnDeals || []).map((deal, cardIdx) => (
+                <div
+                  key={deal.id}
+                  onClick={() => onSelectDeal(deal)}
+                  className="glass p-4 cursor-pointer kanban-card fade-in"
+                  style={{ animationDelay: `${cardIdx * 100}ms` }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="text-sm font-medium text-white">{deal.name}</h4>
+                    <span className="text-xs text-slate-400">{deal.company}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
+                          style={{ width: `${deal.probability}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500">{deal.probability}%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                    <span className="text-xs text-slate-500">{deal.owner}</span>
+                    <span className="text-xs text-slate-500">•</span>
+                    <span className="text-xs text-slate-500">{deal.nextAction}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ActivityFeed({ activities }) {
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'call': return { icon: PhonePanel, color: 'text-emerald-400 bg-emerald-400/10' };
+      case 'email': return { icon: MailPanel, color: 'text-blue-400 bg-blue-400/10' };
+      case 'meeting': return { icon: CalendarPanel, color: 'text-amber-400 bg-amber-400/10' };
+      default: return { icon: MessageSquarePanel, color: 'text-slate-400 bg-slate-400/10' };
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {(activities || []).map((activity, idx) => {
+        const { icon: Icon, color } = getActivityIcon(activity.type);
+        return (
+          <div key={activity.id} className="flex gap-4 fade-in" style={{ animationDelay: `${idx * 100}ms` }}>
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center`}>
+                <Icon size={16} />
+              </div>
+              {idx < activities.length - 1 && <div className="w-px flex-1 bg-white/5 my-2" />}
+            </div>
+            <div className="flex-1 pb-6">
+              <div className="glass p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-white">{activity.description}</span>
+                  <span className="text-xs text-slate-500">{activity.date}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <UsersPanel size={12} />
+                    {activity.contact}
+                  </span>
+                  {activity.duration && (
+                    <span className="flex items-center gap-1">
+                      <ClockPanel size={12} />
+                      {activity.duration}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DealModal({ deal, onClose }) {
+  if (!deal) return null;
+
+  const stageColors = {
+    Lead: 'from-slate-400 to-slate-500',
+    Qualified: 'from-amber-400 to-amber-500',
+    Proposal: 'from-blue-400 to-blue-500',
+    Won: 'from-emerald-400 to-emerald-500',
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-lg mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white">{deal.name}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Value</span>
+            <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Stage</span>
+            <span className={`text-sm font-medium px-3 py-1 rounded-full bg-gradient-to-r ${stageColors[deal.stage]} text-white`}>
+              {deal.stage}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Owner</span>
+            <span className="text-sm text-white">{deal.owner}</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Probability</span>
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
+                  style={{ width: `${deal.probability}%` }}
+                />
+              </div>
+              <span className="text-sm text-white">{deal.probability}%</span>
+            </div>
+          </div>
+          <div className="p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400 block mb-1">Next Action</span>
+            <span className="text-sm text-white flex items-center gap-2">
+              <ChevronRightPanel size={14} className="text-[#00B4D8]" />
+              {deal.nextAction}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Company</span>
+            <span className="text-sm text-white">{deal.company}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewContactForm({ onClose, onSubmit }) {
+  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', status: 'Lead' });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const newErrors = {};
+    if (!form.name.trim()) newErrors.name = 'Name is required';
+    if (!form.company.trim()) newErrors.company = 'Company is required';
+    if (!form.email.trim()) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email format';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.client || !formData.market) {
-      setToast({ type: 'error', message: 'Please fill all fields' });
-      setTimeout(() => setToast(null), 3000);
-      return;
+    if (validate()) {
+      onSubmit({ ...form, id: Date.now(), lastContact: new Date().toISOString().split('T')[0], owner: 'Current User' });
+      onClose();
     }
-    setToast({ type: 'success', message: 'New analysis request created!' });
-    setTimeout(() => setToast(null), 3000);
-    setShowForm(false);
-    setFormData({ client: '', market: '', type: 'analysis' });
   };
 
   return (
-    <div className="glass p-5 fade-in space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">Quick Actions</h3>
-        <button onClick={() => setShowForm(!showForm)} className="p-1.5 rounded-lg bg-[#00BFA5]/20 text-[#00BFA5] hover:bg-[#00BFA5]/30 transition-all">
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {toast && (
-        <div className={`px-3 py-2 rounded-lg text-xs fade-in ${
-          toast.type === 'success' ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
-        }`}>
-          {toast.message}
-        </div>
-      )}
-
-      {showForm && (
-        <form onSubmit={handleSubmit} className="space-y-3 fade-in">
-          <input
-            type="text"
-            placeholder="Client name"
-            value={formData.client}
-            onChange={e => setFormData(f => ({ ...f, client: e.target.value }))}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00BFA5]/50"
-          />
-          <input
-            type="text"
-            placeholder="Target market"
-            value={formData.market}
-            onChange={e => setFormData(f => ({ ...f, market: e.target.value }))}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00BFA5]/50"
-          />
-          <select
-            value={formData.type}
-            onChange={e => setFormData(f => ({ ...f, type: e.target.value }))}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#00BFA5]/50"
-          >
-            <option value="analysis">Market Analysis</option>
-            <option value="strategy">Strategy Plan</option>
-            <option value="report">Custom Report</option>
-          </select>
-          <button type="submit" className="w-full px-3 py-2 rounded-lg bg-[#00BFA5] text-white text-sm font-medium hover:bg-[#00BFA5]/80 transition-all">
-            Generate
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <UsersPanel size={20} className="text-[#00B4D8]" />
+            New Contact
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
           </button>
-        </form>
-      )}
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all">
-          <TrendingUp className="w-4 h-4 text-[#00BFA5]" />
-          <div className="text-xs text-slate-400">Market Analysis</div>
         </div>
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all">
-          <Users className="w-4 h-4 text-[#00BFA5]" />
-          <div className="text-xs text-slate-400">Client Overview</div>
-        </div>
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all">
-          <Activity className="w-4 h-4 text-[#00BFA5]" />
-          <div className="text-xs text-slate-400">Live Strategy Feed</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Dashboard() {
-  const [kpiData, setKpiData] = useState([
-    { icon: Users, label: 'Active Clients', value: '247', delta: '12', trend: 'up' },
-    { icon: TrendingUp, label: 'Revenue Growth', value: '$8.2M', delta: '8.3', trend: 'up' },
-    { icon: Target, label: 'Strategy Score', value: '94', delta: '2.1', trend: 'up' },
-    { icon: BarChart3, label: 'Market Coverage', value: '156', delta: '3.4', trend: 'down' },
-  ]);
-
-  const [chartData, setChartData] = useState([
-    { label: 'Mon', value: 320 },
-    { label: 'Tue', value: 450 },
-    { label: 'Wed', value: 380 },
-    { label: 'Thu', value: 520 },
-    { label: 'Fri', value: 490 },
-    { label: 'Sat', value: 610 },
-    { label: 'Sun', value: 580 },
-  ]);
-
-  const [barData, setBarData] = useState([
-    { label: 'Tech', value: 85 },
-    { label: 'Fin', value: 72 },
-    { label: 'Health', value: 63 },
-    { label: 'Energy', value: 54 },
-    { label: 'Retail', value: 48 },
-  ]);
-
-  const [activityData, setActivityData] = useState([
-    { client: 'Acme Corp', action: 'Market Analysis', status: 'Completed', time: '2 min ago', priority: 'High' },
-    { client: 'GlobalTech Inc', action: 'Strategy Review', status: 'In Progress', time: '15 min ago', priority: 'Medium' },
-    { client: 'Pacific Ventures', action: 'Report Generation', status: 'Pending', time: '1 hour ago', priority: 'Low' },
-    { client: 'Zenith Group', action: 'AI Prediction', status: 'Completed', time: '3 hours ago', priority: 'High' },
-    { client: 'Apex Solutions', action: 'Competitor Analysis', status: 'In Progress', time: '5 hours ago', priority: 'Medium' },
-  ]);
-
-  const columns = [
-    { key: 'client', label: 'Client' },
-    { key: 'action', label: 'Action' },
-    { key: 'status', label: 'Status', render: (val) => (
-      <span className={`px-2 py-0.5 rounded-full text-xs ${
-        val === 'Completed' ? 'bg-green-400/10 text-green-400' :
-        val === 'In Progress' ? 'bg-blue-400/10 text-blue-400' :
-        'bg-yellow-400/10 text-yellow-400'
-      }`}>{val}</span>
-    )},
-    { key: 'time', label: 'Time', sortable: false },
-    { key: 'priority', label: 'Priority', render: (val) => (
-      <span className={`text-xs ${
-        val === 'High' ? 'text-red-400' : val === 'Medium' ? 'text-yellow-400' : 'text-slate-400'
-      }`}>{val}</span>
-    )},
-  ];
-
-  return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold gradient-text">Dashboard Overview</h1>
-        <p className="text-sm text-slate-400 mt-1">AI-powered insights for data-driven business strategy</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        {(kpiData || []).map((kpi, i) => (
-          <KPICard key={i} {...kpi} delay={i * 100} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2 glass p-5 fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-slate-200">Weekly Trend</h3>
-            <select className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-400 focus:outline-none focus:border-[#00BFA5]/50">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Name</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Full name"
+            />
+            {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Company</label>
+            <input
+              type="text"
+              value={form.company}
+              onChange={e => setForm({ ...form, company: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Company name"
+            />
+            {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.email ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="email@company.com"
+            />
+            {errors.email && <p className="text-xs text-red-400 mt-1">{errors.email}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">PhonePanel</label>
+            <input
+              type="text"
+              value={form.phone}
+              onChange={e => setForm({ ...form, phone: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+              placeholder="+1-555-0123"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Status</label>
+            <select
+              value={form.status}
+              onChange={e => setForm({ ...form, status: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+            >
+              <option value="Lead">Lead</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
             </select>
           </div>
-          <LineChart data={chartData} />
-        </div>
-        <div className="glass p-5 fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-slate-200">Industry Coverage</h3>
-            <TrendingUp className="w-4 h-4 text-[#00BFA5]" />
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+            >
+              Create Contact
+            </button>
           </div>
-          <BarChart data={barData} />
-        </div>
+        </form>
       </div>
+    </div>
+  );
+}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 glass p-5 fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-slate-200">Recent Activity</h3>
-            <button className="text-xs text-[#00BFA5] hover:underline">View All</button>
+function NewDealForm({ onClose, onSubmit }) {
+  const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'Lead' });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const newErrors = {};
+    if (!form.name.trim()) newErrors.name = 'Deal name is required';
+    if (!form.company.trim()) newErrors.company = 'Company is required';
+    if (!form.value || form.value <= 0) newErrors.value = 'Value must be a positive number';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validate()) {
+      onSubmit({
+        ...form,
+        id: Date.now(),
+        value: Number(form.value),
+        owner: 'Current User',
+        probability: form.stage === 'Lead' ? 25 : form.stage === 'Qualified' ? 50 : form.stage === 'Proposal' ? 75 : 100,
+        nextAction: 'Pending review',
+      });
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <DollarSign size={20} className="text-[#00B4D8]" />
+            New Deal
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Deal Name</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Enter deal name"
+            />
+            {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
           </div>
-          <DataTable data={activityData} columns={columns} />
-        </div>
-        <QuickActions />
-      </div>
-    </div>
-  );
-}
-
-function Analytics() {
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-bold gradient-text mb-4">Analytics</h1>
-      <div className="glass p-5 fade-in">
-        <p className="text-slate-400">Advanced AI analytics dashboard coming soon. Real-time market predictions, client performance metrics, and strategic insights will be displayed here.</p>
-      </div>
-    </div>
-  );
-}
-
-function Reports() {
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-bold gradient-text mb-4">Reports</h1>
-      <div className="glass p-5 fade-in">
-        <p className="text-slate-400">Custom report generation module. Generate AI-powered strategic reports, market analyses, and client presentations with one click.</p>
-      </div>
-    </div>
-  );
-}
-
-function Settings() {
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-bold gradient-text mb-4">Settings</h1>
-      <div className="glass p-5 fade-in space-y-4">
-        <p className="text-slate-400">Configure AI model parameters, notification preferences, and team collaboration settings.</p>
-        <div className="p-3 bg-white/[0.02] rounded-lg">
-          <label className="text-sm text-slate-300">AI Sensitivity Threshold</label>
-          <input type="range" className="w-full mt-2 accent-[#00BFA5]" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  const [activePage, setActivePage] = useState('dashboard');
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  return (
-    <>
-      <CSSInjection />
-      <div className="flex h-screen overflow-hidden bg-[#06080f] text-slate-100">
-        <Sidebar activePage={activePage} setActivePage={setActivePage} isOpen={menuOpen} setIsOpen={setMenuOpen} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-          <main className="flex-1 overflow-y-auto p-6 scrollbar-custom">
-            {activePage === 'dashboard' && <Dashboard />}
-            {activePage === 'analytics' && <Analytics />}
-            {activePage === 'reports' && <Reports />}
-            {activePage === 'settings' && <Settings />}
-          </main>
-        </div>
-      </div>
-    </>
-  );
-}
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Company</label>
+            <input
+              type="text"
+              value={form.company}
+              onChange={e => setForm({ ...form, company: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Company name"
+            />
+            {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Value ($)</label>
+            <input
+              type="number"
+              value={form.value}
+              onChange={e => setForm({ ...form, value: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.value ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Deal value"
+              min="0"
+            />
+            {errors.value && <p className="text-xs text-red-400 mt-1">{errors.value}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Stage</label>
+            <select
+              value={form.stage}
+              onChange={e => setForm({ ...form, stage: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+            >
+              <option value="Lead">Lead</option>
+              <option value="Qualified">Qualified</option>
+              <option value="Proposal">Proposal</option>
+              <option value="Won">Won</option>
+            </select>
+          </div>
+          <div
