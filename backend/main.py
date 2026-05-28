@@ -1,15 +1,30 @@
 import os
-import uuid
+from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, Boolean
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from datetime import datetime, timedelta
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import uvicorn
 import random
 
-app = FastAPI(title="NovaStrategy", version="1.0.0")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+COMPANY_SLUG = os.environ.get("COMPANY_SLUG", "nova_consulting")
+db_engine = None
+SessionLocal = None
+
+class Base(DeclarativeBase):
+    pass
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    db_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    SessionLocal = sessionmaker(bind=db_engine)
+
+PORT = int(os.environ.get("COMPANY_PORT", 8000))
+
+app = FastAPI(title="NovaMind Insights", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,272 +33,371 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PORT = int(os.environ.get("COMPANY_PORT", 8000))
+# Define Models
+class Contact(Base):
+    __tablename__ = f"{COMPANY_SLUG}_contacts"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(50))
+    company_id = Column(Integer, nullable=False)
+    position = Column(String(255))
+    industry = Column(String(255))
+    status = Column(String(50), default="active")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-# --- MOCK DATA ---
+class Deal(Base):
+    __tablename__ = f"{COMPANY_SLUG}_deals"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    value = Column(Float, nullable=False)
+    stage = Column(String(100), nullable=False)
+    company_id = Column(Integer, nullable=False)
+    contact_id = Column(Integer, nullable=False)
+    probability = Column(Integer, default=50)
+    expected_close_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-team_members = [
-    {"id": "tm-001", "name": "Dr. Elena Vasquez", "role": "CEO & Chief Strategist", "email": "e.vasquez@novamind.com", "specialization": "Corporate Strategy", "years_experience": 18},
-    {"id": "tm-002", "name": "Marcus Chen", "role": "Head of AI Research", "email": "m.chen@novamind.com", "specialization": "Machine Learning", "years_experience": 12},
-    {"id": "tm-003", "name": "Sarah Okafor", "role": "Senior Consultant", "email": "s.okafor@novamind.com", "specialization": "Market Entry Strategy", "years_experience": 9},
-    {"id": "tm-004", "name": "James Thornton", "role": "Data Analytics Lead", "email": "j.thornton@novamind.com", "specialization": "Data Science", "years_experience": 11},
-    {"id": "tm-005", "name": "Priya Sharma", "role": "AI Solutions Architect", "email": "p.sharma@novamind.com", "specialization": "NLP & Recommendation Systems", "years_experience": 8},
-    {"id": "tm-006", "name": "David Kim", "role": "Junior Consultant", "email": "d.kim@novamind.com", "specialization": "Financial Modeling", "years_experience": 3},
-    {"id": "tm-007", "name": "Aisha Patel", "role": "Client Success Manager", "email": "a.patel@novamind.com", "specialization": "Account Management", "years_experience": 7},
-    {"id": "tm-008", "name": "Liam O'Brien", "role": "Research Analyst", "email": "l.obrien@novamind.com", "specialization": "Competitive Intelligence", "years_experience": 5},
-]
+class Company(Base):
+    __tablename__ = f"{COMPANY_SLUG}_companies"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    industry = Column(String(255))
+    size = Column(String(100))
+    revenue = Column(Float)
+    location = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-clients = [
-    {"id": "cli-001", "name": "Aether Global Inc.", "industry": "Technology", "revenue_range": "$10B-$50B", "region": "North America", "status": "active", "contact_email": "contact@aetherglobal.com", "acquisition_date": "2023-03-15", "lifetime_value": 4200000},
-    {"id": "cli-002", "name": "Veridian Financial", "industry": "Financial Services", "revenue_range": "$5B-$20B", "region": "Europe", "status": "active", "contact_email": "info@veridianfin.com", "acquisition_date": "2023-07-01", "lifetime_value": 3800000},
-    {"id": "cli-003", "name": "TerraNova Pharmaceuticals", "industry": "Healthcare", "revenue_range": "$20B-$50B", "region": "North America", "status": "active", "contact_email": "bizdev@terranovapharma.com", "acquisition_date": "2024-01-10", "lifetime_value": 5100000},
-    {"id": "cli-004", "name": "OmniRetail Corp.", "industry": "Retail", "revenue_range": "$5B-$15B", "region": "Asia Pacific", "status": "active", "contact_email": "partnerships@omniretail.asia", "acquisition_date": "2024-04-22", "lifetime_value": 2900000},
-    {"id": "cli-005", "name": "Sapphire Energy", "industry": "Energy", "revenue_range": "$30B-$80B", "region": "Middle East", "status": "active", "contact_email": "strategy@sapphireenergy.ae", "acquisition_date": "2024-06-05", "lifetime_value": 6700000},
-    {"id": "cli-006", "name": "Crestview Manufacturing", "industry": "Manufacturing", "revenue_range": "$2B-$8B", "region": "Europe", "status": "inactive", "contact_email": "info@crestviewmfg.eu", "acquisition_date": "2023-09-18", "lifetime_value": 1800000},
-    {"id": "cli-007", "name": "NexGen Logistics", "industry": "Transportation", "revenue_range": "$1B-$5B", "region": "North America", "status": "active", "contact_email": "hello@nexgenlogistics.com", "acquisition_date": "2025-01-12", "lifetime_value": 2100000},
-]
+class Interaction(Base):
+    __tablename__ = f"{COMPANY_SLUG}_interactions"
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, nullable=False)
+    deal_id = Column(Integer)
+    type = Column(String(100), nullable=False)
+    notes = Column(Text)
+    outcome = Column(String(255))
+    date = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-engagements = [
-    {"id": "eng-001", "client_id": "cli-001", "title": "AI-Driven Market Expansion Strategy", "type": "Market Entry", "status": "in_progress", "start_date": "2024-08-01", "end_date": "2025-02-28", "team_lead": "Dr. Elena Vasquez", "team_members": ["Marcus Chen", "Priya Sharma"], "budget": 850000, "hours_billed": 2200, "description": "Develop AI models to identify optimal markets for Aether Global's cloud expansion in Southeast Asia."},
-    {"id": "eng-002", "client_id": "cli-002", "title": "Digital Transformation Roadmap", "type": "Digital Strategy", "status": "in_progress", "start_date": "2024-09-15", "end_date": "2025-06-30", "team_lead": "James Thornton", "team_members": ["Sarah Okafor", "Liam O'Brien"], "budget": 1200000, "hours_billed": 3400, "description": "Create a data-driven digital transformation roadmap for Veridian's retail banking division."},
-    {"id": "eng-003", "client_id": "cli-003", "title": "Competitive Intelligence & Market Positioning", "type": "Competitive Analysis", "status": "completed", "start_date": "2024-03-01", "end_date": "2024-11-30", "team_lead": "Sarah Okafor", "team_members": ["David Kim", "Aisha Patel"], "budget": 650000, "hours_billed": 1800, "description": "Analyzed TerraNova's competitors and recommended repositioning for their oncology pipeline."},
-    {"id": "eng-004", "client_id": "cli-004", "title": "OmniChannel Retail Strategy", "type": "Retail Strategy", "status": "in_progress", "start_date": "2024-11-01", "end_date": "2025-08-31", "team_lead": "Priya Sharma", "team_members": ["Marcus Chen", "Aisha Patel", "Liam O'Brien"], "budget": 1500000, "hours_billed": 4100, "description": "Building a predictive analytics engine to optimize OmniRetail's inventory and personalization."},
-    {"id": "eng-005", "client_id": "cli-005", "title": "Energy Transition Feasibility Study", "type": "Market Entry", "status": "planning", "start_date": "2025-02-01", "end_date": "2025-10-31", "team_lead": "Dr. Elena Vasquez", "team_members": ["James Thornton", "Sarah Okafor"], "budget": 980000, "hours_billed": 500, "description": "Assess feasibility of Sapphire Energy entering renewable hydrogen markets in Europe."},
-    {"id": "eng-006", "client_id": "cli-006", "title": "Supply Chain Optimization", "type": "Operations", "status": "completed", "start_date": "2023-10-01", "end_date": "2024-06-30", "team_lead": "James Thornton", "team_members": ["David Kim"], "budget": 450000, "hours_billed": 1200, "description": "Optimized Crestview's supply chain using AI-driven demand forecasting."},
-    {"id": "eng-007", "client_id": "cli-007", "title": "Last-Mile Delivery AI Optimization", "type": "Operations", "status": "in_progress", "start_date": "2025-01-15", "end_date": "2025-09-30", "team_lead": "Marcus Chen", "team_members": ["Priya Sharma", "Liam O'Brien"], "budget": 720000, "hours_billed": 1600, "description": "Develop AI routing algorithms to reduce NexGen's last-mile delivery costs by 18%."},
-    {"id": "eng-008", "client_id": "cli-001", "title": "Post-Merger Integration Strategy", "type": "M&A Advisory", "status": "planning", "start_date": "2025-03-01", "end_date": "2025-12-31", "team_lead": "Dr. Elena Vasquez", "team_members": ["Aisha Patel", "David Kim"], "budget": 1100000, "hours_billed": 200, "description": "Advise Aether Global on post-merger integration with a recently acquired AI startup."},
-]
+class Report(Base):
+    __tablename__ = f"{COMPANY_SLUG}_reports"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    type = Column(String(100), nullable=False)
+    data = Column(Text)
+    generated_for = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-ai_reports = [
-    {"id": "rep-001", "engagement_id": "eng-001", "title": "Southeast Asia Market Attractiveness Index", "report_type": "Market Analysis", "created_date": "2024-10-15", "model_version": "NovaPredict v3.2", "confidence_score": 0.87, "key_findings": ["Vietnam and Indonesia show highest growth potential", "Regulatory barriers moderate in financial services sector", "Recommend phased entry starting Q3 2025"], "data_points": 12500, "file_url": "/reports/rep-001.pdf"},
-    {"id": "rep-002", "engagement_id": "eng-002", "title": "Digital Maturity Assessment", "report_type": "Assessment", "created_date": "2024-11-20", "model_version": "NovaAssess v2.1", "confidence_score": 0.92, "key_findings": ["Veridian scores 67/100 on digital maturity", "Customer analytics gap identified", "AI chatbot deployment could reduce call volume 40%"], "data_points": 8900, "file_url": "/reports/rep-002.pdf"},
-    {"id": "rep-003", "engagement_id": "eng-003", "title": "Oncology Competitive Landscape", "report_type": "Competitive Intelligence", "created_date": "2024-06-10", "model_version": "NovaIntel v4.0", "confidence_score": 0.9, "key_findings": ["Three emerging biotechs threaten TerraNova's pipeline", "Pricing pressure expected from biosimilars by 2027", "Recommend strategic partnerships in immuno-oncology"], "data_points": 18700, "file_url": "/reports/rep-003.pdf"},
-    {"id": "rep-004", "engagement_id": "eng-004", "title": "Customer Segmentation & Personalization Model", "report_type": "Analytics", "created_date": "2025-01-05", "model_version": "NovaSeg v1.5", "confidence_score": 0.84, "key_findings": ["6 distinct customer segments identified", "Loyalty program redesign could lift retention 15%", "Personalized recommendations increase basket size 22%"], "data_points": 35000, "file_url": "/reports/rep-004.pdf"},
-    {"id": "rep-005", "engagement_id": "eng-005", "title": "European Green Hydrogen Market Analysis", "report_type": "Market Analysis", "created_date": "2025-02-28", "model_version": "NovaPredict v3.3", "confidence_score": 0.79, "key_findings": ["Germany and Netherlands lead infrastructure development", "Subsidy landscape favorable for early movers", "ROI breakeven projected at 7-year horizon"], "data_points": 14300, "file_url": "/reports/rep-005.pdf"},
-    {"id": "rep-006", "engagement_id": "eng-007", "title": "Route Optimization Algorithm Performance", "report_type": "Performance Analysis", "created_date": "2025-02-15", "model_version": "NovaRoute v2.0", "confidence_score": 0.91, "key_findings": ["12.4% reduction in delivery time achieved", "Fuel costs decreased by 8.7% in pilot", "Scalability across 500+ routes confirmed"], "data_points": 22000, "file_url": "/reports/rep-006.pdf"},
-    {"id": "rep-007", "engagement_id": "eng-002", "title": "Customer Churn Prediction Model", "report_type": "Predictive Modeling", "created_date": "2024-12-18", "model_version": "NovaChurn v1.0", "confidence_score": 0.88, "key_findings": ["High-risk segment: customers aged 25-35 with 3+ complaints", "Model accuracy 92% on test set", "Proactive retention campaigns could save $18M annually"], "data_points": 42000, "file_url": "/reports/rep-007.pdf"},
-]
+# Create tables on startup
+if db_engine:
+    Base.metadata.create_all(bind=db_engine)
 
-# --- Pydantic Models ---
-
+# Pydantic models
 class ContactCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    email: str = Field(..., max_length=200)
-    phone: Optional[str] = None
-    company: Optional[str] = None
-    title: Optional[str] = None
-    source: Optional[str] = "direct"
-
-class ContactUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    company: Optional[str] = None
-    title: Optional[str] = None
-    source: Optional[str] = None
+    name: str
+    email: str
+    phone: str = ""
+    company_id: int = 0
+    position: str = ""
+    industry: str = ""
+    status: str = "active"
 
 class DealCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    value: float = Field(..., ge=0)
-    stage: str = Field(..., pattern="^(lead|qualified|proposal|negotiation|closed_won|closed_lost)$")
-    contact_id: str = Field(..., min_length=1)
-    probability: float = Field(..., ge=0.0, le=1.0)
-    expected_close_date: str
-
-class PipelineStage(BaseModel):
+    name: str
+    value: float
     stage: str
-    count: int
-    total_value: float
+    company_id: int
+    contact_id: int
+    probability: int = 50
+    expected_close_date: str = ""
 
-# --- Endpoints ---
+class InteractionCreate(BaseModel):
+    contact_id: int
+    deal_id: int = 0
+    type: str
+    notes: str = ""
+    outcome: str = ""
 
+class ReportCreate(BaseModel):
+    name: str
+    type: str
+    data: str = ""
+    generated_for: str = ""
+
+# Mock Data
+MOCK_CONTACTS = [
+    {"id": 1, "name": "Sarah Johnson", "email": "sarah.j@acmecorp.com", "phone": "+1-555-0101", "company_id": 1, "position": "VP of Strategy", "industry": "Technology", "status": "active", "created_at": "2024-11-15T10:00:00Z"},
+    {"id": 2, "name": "Michael Chen", "email": "m.chen@globaltech.com", "phone": "+1-555-0102", "company_id": 2, "position": "CEO", "industry": "Technology", "status": "active", "created_at": "2024-11-20T14:30:00Z"},
+    {"id": 3, "name": "Emily Rodriguez", "email": "emily.r@financecorp.com", "phone": "+1-555-0103", "company_id": 3, "position": "Director of Analytics", "industry": "Finance", "status": "active", "created_at": "2024-12-01T09:15:00Z"},
+    {"id": 4, "name": "James Wilson", "email": "j.wilson@retailmax.com", "phone": "+1-555-0104", "company_id": 4, "position": "COO", "industry": "Retail", "status": "active", "created_at": "2024-12-05T11:45:00Z"},
+    {"id": 5, "name": "Lisa Thompson", "email": "lisa.t@healthfirst.com", "phone": "+1-555-0105", "company_id": 5, "position": "Chief Medical Officer", "industry": "Healthcare", "status": "active", "created_at": "2024-12-10T16:00:00Z"},
+    {"id": 6, "name": "David Park", "email": "d.park@energysolutions.com", "phone": "+1-555-0106", "company_id": 6, "position": "VP Business Development", "industry": "Energy", "status": "active", "created_at": "2024-12-15T08:30:00Z"},
+    {"id": 7, "name": "Anna Martinez", "email": "anna.m@manufacturing.com", "phone": "+1-555-0107", "company_id": 7, "position": "Supply Chain Director", "industry": "Manufacturing", "status": "active", "created_at": "2025-01-05T13:00:00Z"},
+    {"id": 8, "name": "Robert Kim", "email": "r.kim@datasystems.com", "phone": "+1-555-0108", "company_id": 8, "position": "CTO", "industry": "Technology", "status": "active", "created_at": "2025-01-10T10:45:00Z"},
+]
+
+MOCK_DEALS = [
+    {"id": 1, "name": "Enterprise AI Strategy", "value": 250000.0, "stage": "Negotiation", "company_id": 1, "contact_id": 1, "probability": 85, "expected_close_date": "2025-03-15T00:00:00Z", "created_at": "2025-01-10T09:00:00Z"},
+    {"id": 2, "name": "Market Entry Analysis - APAC", "value": 180000.0, "stage": "Proposal", "company_id": 2, "contact_id": 2, "probability": 70, "expected_close_date": "2025-04-01T00:00:00Z", "created_at": "2025-01-15T11:30:00Z"},
+    {"id": 3, "name": "Digital Transformation Roadmap", "value": 320000.0, "stage": "Discovery", "company_id": 3, "contact_id": 3, "probability": 60, "expected_close_date": "2025-05-01T00:00:00Z", "created_at": "2025-01-20T14:00:00Z"},
+    {"id": 4, "name": "Data Analytics Framework", "value": 195000.0, "stage": "Qualification", "company_id": 4, "contact_id": 4, "probability": 45, "expected_close_date": "2025-06-01T00:00:00Z", "created_at": "2025-02-01T10:00:00Z"},
+    {"id": 5, "name": "Operational Efficiency Audit", "value": 150000.0, "stage": "Closed Won", "company_id": 5, "contact_id": 5, "probability": 100, "expected_close_date": "2025-02-28T00:00:00Z", "created_at": "2024-12-20T08:30:00Z"},
+    {"id": 6, "name": "Sustainability Strategy", "value": 275000.0, "stage": "Negotiation", "company_id": 6, "contact_id": 6, "probability": 80, "expected_close_date": "2025-03-30T00:00:00Z", "created_at": "2025-01-25T16:15:00Z"},
+    {"id": 7, "name": "Supply Chain Optimization", "value": 210000.0, "stage": "Proposal", "company_id": 7, "contact_id": 7, "probability": 65, "expected_close_date": "2025-04-15T00:00:00Z", "created_at": "2025-02-05T12:00:00Z"},
+    {"id": 8, "name": "AI Implementation Program", "value": 450000.0, "stage": "Discovery", "company_id": 8, "contact_id": 8, "probability": 55, "expected_close_date": "2025-05-15T00:00:00Z", "created_at": "2025-02-10T09:45:00Z"},
+]
+
+MOCK_COMPANIES = [
+    {"id": 1, "name": "Acme Corporation", "industry": "Technology", "size": "5000+", "revenue": 5000000000.0, "location": "San Francisco, CA", "created_at": "2024-01-01T00:00:00Z"},
+    {"id": 2, "name": "GlobalTech Solutions", "industry": "Technology", "size": "1000-5000", "revenue": 1200000000.0, "location": "New York, NY", "created_at": "2024-01-05T00:00:00Z"},
+    {"id": 3, "name": "FinanceCorp International", "industry": "Finance", "size": "1000-5000", "revenue": 2500000000.0, "location": "Chicago, IL", "created_at": "2024-01-10T00:00:00Z"},
+    {"id": 4, "name": "RetailMax Group", "industry": "Retail", "size": "5000+", "revenue": 8000000000.0, "location": "Los Angeles, CA", "created_at": "2024-01-15T00:00:00Z"},
+    {"id": 5, "name": "HealthFirst Medical", "industry": "Healthcare", "size": "1000-5000", "revenue": 3500000000.0, "location": "Boston, MA", "created_at": "2024-01-20T00:00:00Z"},
+    {"id": 6, "name": "Energy Solutions Inc.", "industry": "Energy", "size": "500-1000", "revenue": 800000000.0, "location": "Houston, TX", "created_at": "2024-02-01T00:00:00Z"},
+    {"id": 7, "name": "ManufacturingCo", "industry": "Manufacturing", "size": "5000+", "revenue": 4000000000.0, "location": "Detroit, MI", "created_at": "2024-02-05T00:00:00Z"},
+    {"id": 8, "name": "DataSystems Corp", "industry": "Technology", "size": "500-1000", "revenue": 600000000.0, "location": "Seattle, WA", "created_at": "2024-02-10T00:00:00Z"},
+]
+
+MOCK_INTERACTIONS = [
+    {"id": 1, "contact_id": 1, "deal_id": 1, "type": "Meeting", "notes": "Discussed AI strategy implementation timeline and resource requirements", "outcome": "Positive - moving to next phase", "date": "2025-01-15T10:00:00Z", "created_at": "2025-01-15T10:00:00Z"},
+    {"id": 2, "contact_id": 2, "deal_id": 2, "type": "Call", "notes": "Reviewed market entry proposal for Southeast Asian markets", "outcome": "Interested - requested additional data", "date": "2025-01-20T14:30:00Z", "created_at": "2025-01-20T14:30:00Z"},
+    {"id": 3, "contact_id": 3, "deal_id": 3, "type": "Email", "notes": "Sent digital transformation case studies and ROI projections", "outcome": "Engaged - scheduling follow-up", "date": "2025-01-25T09:15:00Z", "created_at": "2025-01-25T09:15:00Z"},
+    {"id": 4, "contact_id": 4, "deal_id": 4, "type": "Meeting", "notes": "Presented data analytics framework proposal to executive team", "outcome": "Positive - legal review pending", "date": "2025-02-05T11:00:00Z", "created_at": "2025-02-05T11:00:00Z"},
+    {"id": 5, "contact_id": 5, "deal_id": 5, "type": "Call", "notes": "Finalized operational efficiency audit contract details", "outcome": "Closed - contract signed", "date": "2025-02-10T16:00:00Z", "created_at": "2025-02-10T16:00:00Z"},
+    {"id": 6, "contact_id": 6, "deal_id": 6, "type": "Meeting", "notes": "Workshop on sustainability metrics and reporting standards", "outcome": "Productive - defined scope", "date": "2025-02-15T13:30:00Z", "created_at": "2025-02-15T13:30:00Z"},
+]
+
+MOCK_REPORTS = [
+    {"id": 1, "name": "Q1 2025 Pipeline Analysis", "type": "Pipeline", "data": "{\"total_deals\": 24, "total_value\": 4500000, "win_rate\": 0.72}", "generated_for": "Executive Team", "created_at": "2024-12-01T08:00:00Z"},
+    {"id": 2, "name": "Monthly Contact Engagement", "type": "Engagement", "data": "{\"total_contacts\": 156, "active_contacts": 89, "interaction_rate\": 0.65}", "generated_for": "Sales Team", "created_at": "2025-01-01T08:00:00Z"},
+    {"id": 3, "name": "Deal Stage Distribution", "type": "Deal Health", "data": "{\"discovery\": 5, "qualification\": 4, "proposal\": 3, "negotiation\": 2, "closed_won\": 1}", "generated_for": "Management", "created_at": "2025-01-15T10:00:00Z"},
+    {"id": 4, "name": "Industry Sector Insights", "type": "Industry Analysis", "data": "{\"technology\": 0.35, "finance\": 0.20, "healthcare\": 0.15, "retail\": 0.12, "energy\": 0.10, "manufacturing\": 0.08}", "generated_for": "Strategy Team", "created_at": "2025-02-01T09:00:00Z"},
+    {"id": 5, "name": "Revenue Forecast Q2 2025", "type": "Forecast", "data": "{\"expected_revenue\": 3250000, "confidence_high\": 0.85, "confidence_low\": 0.60}", "generated_for": "Board of Directors", "created_at": "2025-02-15T14:00:00Z"},
+]
+
+# Helpers
+def get_db():
+    if SessionLocal:
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+    else:
+        yield None
+
+# Core Endpoints
 @app.get("/health")
-def health():
-    return {"status": "ok", "app": "NovaStrategy", "version": "1.0.0"}
+def health_check():
+    return {"status": "ok", "app": "NovaMind Insights", "version": "1.0.0"}
 
 @app.get("/api/info")
-def api_info():
+def get_info():
     return {
-        "company": "NovaMind Consulting",
-        "app": "NovaStrategy",
-        "tagline": "AI-Powered Strategy for the Fortune 500",
-        "founded": "2019",
-        "headquarters": "San Francisco, CA",
-        "team_size": 48,
-        "clients_served": 18,
-        "avg_engagement_value": 850000,
-        "specialties": ["Market Entry Strategy", "Digital Transformation", "Competitive Intelligence", "AI-Driven Analytics"],
-        "certifications": ["ISO 9001:2023", "SOC 2 Type II", "GDPR Compliant"],
-        "mission": "Empower Fortune 500 companies with data-driven business strategy and market entry recommendations using cutting-edge AI."
+        "name": "NovaMind Consulting",
+        "app_name": "NovaMind Insights",
+        "tagline": "Transforming data into strategy for Fortune 500 leaders",
+        "founded": "2020",
+        "team_size": 85,
+        "industry_focus": ["Technology", "Finance", "Healthcare", "Energy", "Retail", "Manufacturing"],
+        "headquarters": "New York, NY",
+        "certifications": ["ISO 27001", "GDPR Compliant", "SOC 2 Type II"]
     }
 
 @app.get("/api/metrics")
-def api_metrics():
+def get_metrics():
     return {
-        "active_engagements": 5,
-        "total_clients": 7,
-        "active_clients": 6,
-        "total_revenue_ytd": 5870000,
-        "pipeline_value": 3200000,
-        "avg_client_lifetime_value": 3800000,
-        "ai_reports_generated": 47,
-        "team_utilization_rate": 0.82,
-        "client_satisfaction_score": 4.7,
-        "avg_engagement_duration_days": 245,
-        "repeat_client_rate": 0.71,
-        "quarterly_growth_rate": 0.12
+        "active_deals": 18,
+        "pipeline_value": 4500000.0,
+        "won_revenue_ytd": 2150000.0,
+        "average_deal_size": 250000.0,
+        "win_rate_percent": 68,
+        "contacts_in_pipeline": 156,
+        "conversion_rate_percent": 22,
+        "interaction_rate_per_week": 37,
+        "total_revenue_target": 8000000.0,
+        "quarterly_progress_percent": 52
     }
 
+# Domain-specific endpoints for CRM
+
+# Contacts
 @app.get("/api/contacts")
 def get_contacts():
-    contacts = [
-        {"id": "con-001", "name": "Jennifer Walsh", "email": "j.walsh@aetherglobal.com", "phone": "+1-415-555-0123", "company": "Aether Global Inc.", "title": "VP of Strategy", "source": "referral", "created_date": "2023-02-10", "last_contacted": "2025-01-20"},
-        {"id": "con-002", "name": "Thomas Richter", "email": "t.richter@veridianfin.com", "phone": "+49-30-555-7890", "company": "Veridian Financial", "title": "Chief Digital Officer", "source": "conference", "created_date": "2023-06-14", "last_contacted": "2025-02-05"},
-        {"id": "con-003", "name": "Dr. Lisa Chang", "email": "l.chang@terranovapharma.com", "phone": "+1-617-555-4567", "company": "TerraNova Pharmaceuticals", "title": "Head of Business Development", "source": "linkedin", "created_date": "2023-11-28", "last_contacted": "2025-01-28"},
-        {"id": "con-004", "name": "Kenji Nakamura", "email": "k.nakamura@omniretail.asia", "phone": "+81-3-555-2345", "company": "OmniRetail Corp.", "title": "Director of Innovation", "source": "direct", "created_date": "2024-03-05", "last_contacted": "2025-02-12"},
-        {"id": "con-005", "name": "Fatima Al-Rashid", "email": "f.alrashid@sapphireenergy.ae", "phone": "+971-4-555-6789", "company": "Sapphire Energy", "title": "VP of Corporate Strategy", "source": "referral", "created_date": "2024-05-20", "last_contacted": "2025-02-01"},
-        {"id": "con-006", "name": "Olivia Dupont", "email": "o.dupont@crestviewmfg.eu", "phone": "+33-1-555-3456", "company": "Crestview Manufacturing", "title": "Supply Chain Director", "source": "email_campaign", "created_date": "2023-08-22", "last_contacted": "2024-09-15"},
-        {"id": "con-007", "name": "Michael Torres", "email": "m.torres@nexgenlogistics.com", "phone": "+1-312-555-9012", "company": "NexGen Logistics", "title": "COO", "source": "direct", "created_date": "2024-12-01", "last_contacted": "2025-02-18"},
-        {"id": "con-008", "name": "Dr. Sarah Mitchell", "email": "s.mitchell@innovatebio.com", "phone": "+1-650-555-1111", "company": "InnovateBio", "title": "CEO", "source": "conference", "created_date": "2025-01-15", "last_contacted": "2025-02-10"},
-    ]
-    return {"count": len(contacts), "contacts": contacts}
-
-@app.get("/api/deals")
-def get_deals():
-    deals = [
-        {"id": "deal-001", "title": "Aether Global AI Expansion Phase 2", "value": 920000, "stage": "negotiation", "contact_id": "con-001", "contact_name": "Jennifer Walsh", "probability": 0.75, "expected_close_date": "2025-04-30", "created_date": "2025-01-10"},
-        {"id": "deal-002", "title": "Veridian Retail Banking AI Suite", "value": 1450000, "stage": "proposal", "contact_id": "con-002", "contact_name": "Thomas Richter", "probability": 0.6, "expected_close_date": "2025-05-15", "created_date": "2025-02-01"},
-        {"id": "deal-003", "title": "TerraNova Market Entry Europe", "value": 780000, "stage": "lead", "contact_id": "con-003", "contact_name": "Dr. Lisa Chang", "probability": 0.2, "expected_close_date": "2025-07-01", "created_date": "2025-02-12"},
-        {"id": "deal-004", "title": "OmniRetail Supply Chain AI", "value": 1150000, "stage": "qualified", "contact_id": "con-004", "contact_name": "Kenji Nakamura", "probability": 0.45, "expected_close_date": "2025-06-30", "created_date": "2025-01-25"},
-        {"id": "deal-005", "title": "Sapphire Energy Hydrogen Feasibility Phase 2", "value": 1100000, "stage": "proposal", "contact_id": "con-005", "contact_name": "Fatima Al-Rashid", "probability": 0.65, "expected_close_date": "2025-04-01", "created_date": "2025-02-05"},
-        {"id": "deal-006", "title": "NexGen Fleet Optimization Platform", "value": 680000, "stage": "qualified", "contact_id": "con-007", "contact_name": "Michael Torres", "probability": 0.4, "expected_close_date": "2025-08-01", "created_date": "2025-02-20"},
-        {"id": "deal-007", "title": "InnovateBio Launch Strategy Consulting", "value": 350000, "stage": "lead", "contact_id": "con-008", "contact_name": "Dr. Sarah Mitchell", "probability": 0.15, "expected_close_date": "2025-09-01", "created_date": "2025-03-01"},
-        {"id": "deal-008", "title": "Aether Global M&A Advisory Retainer", "value": 2200000, "stage": "lead", "contact_id": "con-001", "contact_name": "Jennifer Walsh", "probability": 0.1, "expected_close_date": "2025-12-31", "created_date": "2025-02-28"},
-    ]
-    return {"count": len(deals), "deals": deals}
-
-@app.get("/api/pipeline")
-def get_pipeline():
-    stages_data = [
-        {"stage": "lead", "count": 3, "total_value": 3330000},
-        {"stage": "qualified", "count": 2, "total_value": 1830000},
-        {"stage": "proposal", "count": 2, "total_value": 2550000},
-        {"stage": "negotiation", "count": 1, "total_value": 920000},
-        {"stage": "closed_won", "count": 0, "total_value": 0},
-        {"stage": "closed_lost", "count": 0, "total_value": 0},
-    ]
-    total_pipeline = sum(s["total_value"] for s in stages_data)
-    return {"stages": stages_data, "total_pipeline_value": total_pipeline, "total_deals": sum(s["count"] for s in stages_data)}
-
-@app.get("/api/clients")
-def get_clients():
-    return {"count": len(clients), "clients": clients}
-
-@app.get("/api/engagements")
-def get_engagements():
-    return {"count": len(engagements), "engagements": engagements}
-
-@app.get("/api/engagements/{engagement_id}")
-def get_engagement(engagement_id: str):
-    for eng in engagements:
-        if eng["id"] == engagement_id:
-            return eng
-    raise HTTPException(status_code=404, detail="Engagement not found")
-
-@app.get("/api/ai-reports")
-def get_ai_reports():
-    return {"count": len(ai_reports), "reports": ai_reports}
-
-@app.get("/api/ai-reports/{report_id}")
-def get_ai_report(report_id: str):
-    for rep in ai_reports:
-        if rep["id"] == report_id:
-            return rep
-    raise HTTPException(status_code=404, detail="Report not found")
-
-@app.get("/api/team-members")
-def get_team_members():
-    return {"count": len(team_members), "team_members": team_members}
+    if SessionLocal:
+        db = SessionLocal()
+        contacts = db.query(Contact).all()
+        db.close()
+        return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "company_id": c.company_id, "position": c.position, "industry": c.industry, "status": c.status, "created_at": c.created_at.isoformat()} for c in contacts]
+    return MOCK_CONTACTS
 
 @app.post("/api/contacts")
 def create_contact(contact: ContactCreate):
-    new_contact = contact.model_dump()
-    new_contact["id"] = f"con-{uuid.uuid4().hex[:8]}"
-    new_contact["created_date"] = datetime.now().strftime("%Y-%m-%d")
-    new_contact["last_contacted"] = datetime.now().strftime("%Y-%m-%d")
-    contacts_list = [c for c in get_contacts()["contacts"]] if False else []
-    return {"message": "Contact created", "contact": new_contact}
+    if SessionLocal:
+        db = SessionLocal()
+        new_contact = Contact(name=contact.name, email=contact.email, phone=contact.phone, company_id=contact.company_id, position=contact.position, industry=contact.industry, status=contact.status)
+        db.add(new_contact)
+        db.commit()
+        db.refresh(new_contact)
+        db.close()
+        return {"id": new_contact.id, "name": new_contact.name, "email": new_contact.email, "phone": new_contact.phone, "company_id": new_contact.company_id, "position": new_contact.position, "industry": new_contact.industry, "status": new_contact.status, "created_at": new_contact.created_at.isoformat()}
+    new_id = max(c["id"] for c in MOCK_CONTACTS) + 1
+    new_entry = {"id": new_id, **contact.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
+    MOCK_CONTACTS.append(new_entry)
+    return new_entry
 
-@app.put("/api/contacts/{contact_id}")
-def update_contact(contact_id: str, contact: ContactUpdate):
-    return {"message": "Contact updated", "contact_id": contact_id, "updated_fields": contact.model_dump(exclude_none=True)}
+# Deals
+@app.get("/api/deals")
+def get_deals():
+    if SessionLocal:
+        db = SessionLocal()
+        deals = db.query(Deal).all()
+        db.close()
+        return [{"id": d.id, "name": d.name, "value": d.value, "stage": d.stage, "company_id": d.company_id, "contact_id": d.contact_id, "probability": d.probability, "expected_close_date": d.expected_close_date.isoformat() if d.expected_close_date else "", "created_at": d.created_at.isoformat()} for d in deals]
+    return MOCK_DEALS
 
 @app.post("/api/deals")
 def create_deal(deal: DealCreate):
-    new_deal = deal.model_dump()
-    new_deal["id"] = f"deal-{uuid.uuid4().hex[:8]}"
-    new_deal["created_date"] = datetime.now().strftime("%Y-%m-%d")
-    return {"message": "Deal created", "deal": new_deal}
+    if SessionLocal:
+        db = SessionLocal()
+        new_deal = Deal(name=deal.name, value=deal.value, stage=deal.stage, company_id=deal.company_id, contact_id=deal.contact_id, probability=deal.probability)
+        if deal.expected_close_date:
+            new_deal.expected_close_date = datetime.fromisoformat(deal.expected_close_date.replace("Z", "+00:00"))
+        db.add(new_deal)
+        db.commit()
+        db.refresh(new_deal)
+        db.close()
+        return {"id": new_deal.id, "name": new_deal.name, "value": new_deal.value, "stage": new_deal.stage, "company_id": new_deal.company_id, "contact_id": new_deal.contact_id, "probability": new_deal.probability, "expected_close_date": new_deal.expected_close_date.isoformat() if new_deal.expected_close_date else "", "created_at": new_deal.created_at.isoformat()}
+    new_id = max(d["id"] for d in MOCK_DEALS) + 1
+    new_entry = {"id": new_id, **deal.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
+    MOCK_DEALS.append(new_entry)
+    return new_entry
 
+# Pipeline
+@app.get("/api/pipeline")
+def get_pipeline():
+    stages = ["Discovery", "Qualification", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
+    pipeline_data = {}
+    for stage in stages:
+        if SessionLocal:
+            db = SessionLocal()
+            stage_deals = db.query(Deal).filter(Deal.stage == stage).all()
+            db.close()
+        else:
+            stage_deals = [d for d in MOCK_DEALS if d["stage"] == stage]
+        pipeline_data[stage] = {
+            "count": len(stage_deals),
+            "total_value": sum(d["value"] if isinstance(d, dict) else d.value for d in stage_deals)
+        }
+    return pipeline_data
+
+# Interactions
+@app.get("/api/interactions")
+def get_interactions():
+    if SessionLocal:
+        db = SessionLocal()
+        interactions = db.query(Interaction).all()
+        db.close()
+        return [{"id": i.id, "contact_id": i.contact_id, "deal_id": i.deal_id, "type": i.type, "notes": i.notes, "outcome": i.outcome, "date": i.date.isoformat(), "created_at": i.created_at.isoformat()} for i in interactions]
+    return MOCK_INTERACTIONS
+
+@app.post("/api/interactions")
+def create_interaction(interaction: InteractionCreate):
+    if SessionLocal:
+        db = SessionLocal()
+        new_interaction = Interaction(contact_id=interaction.contact_id, deal_id=interaction.deal_id, type=interaction.type, notes=interaction.notes, outcome=interaction.outcome)
+        db.add(new_interaction)
+        db.commit()
+        db.refresh(new_interaction)
+        db.close()
+        return {"id": new_interaction.id, "contact_id": new_interaction.contact_id, "deal_id": new_interaction.deal_id, "type": new_interaction.type, "notes": new_interaction.notes, "outcome": new_interaction.outcome, "date": new_interaction.date.isoformat(), "created_at": new_interaction.created_at.isoformat()}
+    new_id = max(i["id"] for i in MOCK_INTERACTIONS) + 1
+    new_entry = {"id": new_id, **interaction.dict(), "date": datetime.utcnow().isoformat() + "Z", "created_at": datetime.utcnow().isoformat() + "Z"}
+    MOCK_INTERACTIONS.append(new_entry)
+    return new_entry
+
+# Companies
+@app.get("/api/companies")
+def get_companies():
+    if SessionLocal:
+        db = SessionLocal()
+        companies = db.query(Company).all()
+        db.close()
+        return [{"id": c.id, "name": c.name, "industry": c.industry, "size": c.size, "revenue": c.revenue, "location": c.location, "created_at": c.created_at.isoformat()} for c in companies]
+    return MOCK_COMPANIES
+
+# Reports
+@app.get("/api/reports")
+def get_reports():
+    if SessionLocal:
+        db = SessionLocal()
+        reports = db.query(Report).all()
+        db.close()
+        return [{"id": r.id, "name": r.name, "type": r.type, "data": r.data, "generated_for": r.generated_for, "created_at": r.created_at.isoformat()} for r in reports]
+    return MOCK_REPORTS
+
+@app.post("/api/reports")
+def create_report(report: ReportCreate):
+    if SessionLocal:
+        db = SessionLocal()
+        new_report = Report(name=report.name, type=report.type, data=report.data, generated_for=report.generated_for)
+        db.add(new_report)
+        db.commit()
+        db.refresh(new_report)
+        db.close()
+        return {"id": new_report.id, "name": new_report.name, "type": new_report.type, "data": new_report.data, "generated_for": new_report.generated_for, "created_at": new_report.created_at.isoformat()}
+    new_id = max(r["id"] for r in MOCK_REPORTS) + 1
+    new_entry = {"id": new_id, **report.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
+    MOCK_REPORTS.append(new_entry)
+    return new_entry
+
+# Additional CRM analytics endpoints
 @app.get("/api/stats")
 def get_stats():
-    active_engagements_budget = sum(e["budget"] for e in engagements if e["status"] == "in_progress")
-    completed_engagements = sum(1 for e in engagements if e["status"] == "completed")
-    total_hours = sum(e["hours_billed"] for e in engagements)
-    avg_hours_per_engagement = round(total_hours / len(engagements), 1) if engagements else 0
     return {
-        "active_engagements_count": sum(1 for e in engagements if e["status"] in ["in_progress", "planning"]),
-        "completed_engagements_count": completed_engagements,
-        "active_budget_total": active_engagements_budget,
-        "total_hours_billed": total_hours,
-        "avg_hours_per_engagement": avg_hours_per_engagement,
-        "reports_generated": len(ai_reports),
-        "avg_report_confidence": round(sum(r["confidence_score"] for r in ai_reports) / len(ai_reports), 2),
-        "team_size": len(team_members)
+        "total_contacts": 156,
+        "active_contacts": 89,
+        "total_deals": 24,
+        "deals_won_this_month": 3,
+        "deals_lost_this_month": 1,
+        "average_cycle_days": 45,
+        "total_companies": 48,
+        "interactions_this_week": 37,
+        "pipeline_value": 4500000.0,
+        "forecasted_revenue": 3250000.0
     }
 
 @app.get("/api/recent-activity")
 def get_recent_activity():
-    activities = [
-        {"type": "report_generated", "description": "Route Optimization Algorithm Performance report completed for NexGen Logistics", "timestamp": "2025-02-15T14:30:00Z", "user": "Marcus Chen", "engagement_id": "eng-007"},
-        {"type": "deal_created", "description": "New deal: InnovateBio Launch Strategy Consulting ($350,000)", "timestamp": "2025-03-01T09:15:00Z", "user": "Sarah Okafor", "deal_id": "deal-007"},
-        {"type": "engagement_status", "description": "Sapphire Energy feasibility study moved to planning phase", "timestamp": "2025-02-25T11:00:00Z", "user": "Dr. Elena Vasquez", "engagement_id": "eng-005"},
-        {"type": "contact_added", "description": "New contact: Dr. Sarah Mitchell (CEO, InnovateBio)", "timestamp": "2025-01-15T16:45:00Z", "user": "Aisha Patel", "contact_id": "con-008"},
-        {"type": "report_generated", "description": "European Green Hydrogen Market Analysis report completed for Sapphire Energy", "timestamp": "2025-02-28T13:00:00Z", "user": "James Thornton", "engagement_id": "eng-005"},
-        {"type": "deal_stage_change", "description": "Aether Global AI Expansion Phase 2 moved to negotiation stage", "timestamp": "2025-02-20T10:30:00Z", "user": "Aisha Patel", "deal_id": "deal-001"},
-        {"type": "engagement_milestone", "description": "OmniRetail project: Customer segmentation model delivered ahead of schedule", "timestamp": "2025-01-05T15:00:00Z", "user": "Priya Sharma", "engagement_id": "eng-004"},
-        {"type": "team_update", "description": "Liam O'Brien joined OmniRetail engagement team", "timestamp": "2025-02-10T08:00:00Z", "user": "Dr. Elena Vasquez", "engagement_id": "eng-004"},
+    return [
+        {"id": 1, "type": "deal_closed", "description": "Deal 'Operational Efficiency Audit' closed with HealthFirst Medical", "value": 150000.0, "timestamp": "2025-02-28T16:30:00Z", "user": "AI Assistant"},
+        {"id": 2, "type": "meeting", "description": "Strategy meeting with GlobalTech Solutions CEO", "timestamp": "2025-02-27T10:00:00Z", "user": "John Smith"},
+        {"id": 3, "type": "contact_added", "description": "New contact added: Robert Kim from DataSystems Corp", "timestamp": "2025-02-25T14:15:00Z", "user": "Sarah Chen"},
+        {"id": 4, "type": "proposal_sent", "description": "Enterprise AI Strategy proposal sent to Acme Corporation", "value": 250000.0, "timestamp": "2025-02-24T09:45:00Z", "user": "AI Assistant"},
+        {"id": 5, "type": "report_generated", "description": "AI-powered revenue forecast report generated for Board of Directors", "timestamp": "2025-02-23T11:00:00Z", "user": "System"}
     ]
-    return {"activities": activities}
 
 @app.get("/api/chart-data")
 def get_chart_data():
-    monthly_revenue = [
-        {"month": "2024-09", "revenue": 420000, "new_clients": 1},
-        {"month": "2024-10", "revenue": 510000, "new_clients": 0},
-        {"month": "2024-11", "revenue": 480000, "new_clients": 1},
-        {"month": "2024-12", "revenue": 550000, "new_clients": 0},
-        {"month": "2025-01", "revenue": 680000, "new_clients": 2},
-        {"month": "2025-02", "revenue": 720000, "new_clients": 1},
-    ]
-    engagement_status_distribution = {
-        "in_progress": 4,
-        "planning": 2,
-        "completed": 2,
-    }
-    report_types = {
-        "Market Analysis": 2,
-        "Competitive Intelligence": 1,
-        "Predictive Modeling": 1,
-        "Assessment": 1,
-        "Analytics": 1,
-        "Performance Analysis": 1,
-    }
     return {
-        "monthly_revenue": monthly_revenue,
-        "engagement_status_distribution": engagement_status_distribution,
-        "report_types": report_types
+        "pipeline_by_stage": {
+            "labels": ["Discovery", "Qualification", "Proposal", "Negotiation", "Closed Won"],
+            "values": [450000, 520000, 680000, 850000, 2150000],
+            "counts": [5, 4, 3, 2, 1]
+        },
+        "monthly_revenue": {
+            "labels": ["Oct", "Nov", "Dec", "Jan", "Feb"],
+            "values": [150000, 180000, 220000, 310000, 420000]
+        },
+        "industry_distribution": {
+            "labels": ["Technology", "Finance", "Healthcare", "Retail", "Energy", "Manufacturing"],
+            "values": [35, 20, 15, 12, 10, 8]
+        },
+        "engagement_trend": {
+            "labels": ["Week 1", "Week 2", "Week 3", "Week 4"],
+            "values": [28, 32, 35, 37]
+        }
     }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
