@@ -1,8 +1,31 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Search, Users, Briefcase, TrendingUp, Activity, Phone, Mail, Calendar, Plus, X, ChevronDown, ChevronUp, Clock, Building2, User, Flag, DollarSign } from 'lucide-react';
+```jsx
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  SearchPanel,
+  PlusPanel,
+  UsersPanel,
+  DollarSign,
+  TargetPanel,
+  ActivityPanel,
+  FileTextPanel,
+  FilterPanel,
+  SortAsc,
+  SortDesc,
+  DownloadPanel,
+  CheckCirclePanel,
+  PhonePanel,
+  MailPanel,
+  CalendarPanel,
+  MessageSquarePanel,
+  ChevronRightPanel,
+  ClockPanel,
+  Building2,
+  TrendingUpPanel,
+  BarChart3Panel,
+  XPanel,
+} from 'lucide-react';
 
 const BASE = window.__BACKEND_URL__ || '';
-
 async function apiFetch(path, opts = {}) {
   for (let i = 0; i < 5; i++) {
     try {
@@ -14,242 +37,182 @@ async function apiFetch(path, opts = {}) {
   return null;
 }
 
-function useInjectStyles() {
+const MOCK_CONTACTS = [
+  { id: 1, name: 'Sarah Chen', company: 'TechGlobal Inc', status: 'Active', lastContact: '2024-01-15', email: 'sarah@techglobal.com', phone: '+1-555-0123', owner: 'Alex M' },
+  { id: 2, name: 'Marcus Johnson', company: 'Apex Ventures', status: 'Lead', lastContact: '2024-01-12', email: 'marcus@apex.com', phone: '+1-555-0124', owner: 'Julia R' },
+  { id: 3, name: 'Emily Rodriguez', company: 'Summit Corp', status: 'Active', lastContact: '2024-01-10', email: 'emily@summitcorp.com', phone: '+1-555-0125', owner: 'Alex M' },
+  { id: 4, name: 'David Kim', company: 'Horizon Group', status: 'Inactive', lastContact: '2023-12-20', email: 'david@horizon.com', phone: '+1-555-0126', owner: 'Tom W' },
+  { id: 5, name: 'Lisa Thompson', company: 'NexGen Solutions', status: 'Active', lastContact: '2024-01-14', email: 'lisa@nexgen.com', phone: '+1-555-0127', owner: 'Julia R' },
+];
+
+const MOCK_DEALS = [
+  { id: 1, name: 'Enterprise SaaS Platform', company: 'TechGlobal Inc', value: 450000, stage: 'Won', owner: 'Alex M', probability: 100, nextAction: 'Contract signing' },
+  { id: 2, name: 'AI Consulting Package', company: 'Apex Ventures', value: 280000, stage: 'Proposal', owner: 'Julia R', probability: 75, nextAction: 'Send proposal' },
+  { id: 3, name: 'Market Entry Strategy', company: 'Summit Corp', value: 320000, stage: 'Qualified', owner: 'Alex M', probability: 50, nextAction: 'Discovery call' },
+  { id: 4, name: 'Data Analytics Suite', company: 'Horizon Group', value: 180000, stage: 'Lead', owner: 'Tom W', probability: 25, nextAction: 'Initial outreach' },
+  { id: 5, name: 'Digital Transformation', company: 'NexGen Solutions', value: 550000, stage: 'Proposal', owner: 'Julia R', probability: 80, nextAction: 'Negotiation' },
+  { id: 6, name: 'Cloud Migration', company: 'TechGlobal Inc', value: 380000, stage: 'Qualified', owner: 'Alex M', probability: 60, nextAction: 'Technical demo' },
+  { id: 7, name: 'AI Automation', company: 'Apex Ventures', value: 220000, stage: 'Lead', owner: 'Julia R', probability: 30, nextAction: 'Follow-up email' },
+];
+
+const MOCK_ACTIVITIES = [
+  { id: 1, type: 'call', description: 'Discovery call with Sarah Chen', date: '2024-01-15 14:30', duration: '45 min', contact: 'Sarah Chen' },
+  { id: 2, type: 'email', description: 'Sent proposal to Marcus Johnson', date: '2024-01-14 11:00', contact: 'Marcus Johnson' },
+  { id: 3, type: 'meeting', description: 'Strategy workshop with TechGlobal', date: '2024-01-13 10:00', duration: '2 hours', contact: 'Sarah Chen' },
+  { id: 4, type: 'call', description: 'Follow-up with Emily Rodriguez', date: '2024-01-12 15:00', duration: '30 min', contact: 'Emily Rodriguez' },
+  { id: 5, type: 'email', description: 'Contract sent to Lisa Thompson', date: '2024-01-11 09:30', contact: 'Lisa Thompson' },
+];
+
+const PIPELINE_COLUMNS = ['Lead', 'Qualified', 'Proposal', 'Won'];
+
+function useCSS() {
   useEffect(() => {
     const style = document.createElement('style');
-    style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      :root { --accent: #00A86B; --accent2: #1A3A5C; }
-      .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
-      .gradient-text { background: linear-gradient(135deg, #00A86B, #1A3A5C, #00A86B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-      .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-      @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
-      @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
-      .fade-in { animation: fadeIn 0.3s ease forwards; }
-    `;
-    document.head.appendChild(style);
+    style.textContent = ':root { --accent: #00C9A7; --accent2: #1E3A5F; }';
+      document.head.appendChild(style);
+    return () => style.remove();
   }, []);
 }
 
-function Sidebar({ activeView, setActiveView }) {
+function Sidebar({ activeTab, setActiveTab, setShowNewContact, setShowNewDeal }) {
   const navItems = [
-    { id: 'contacts', label: 'Contacts', icon: Users },
+    { id: 'contacts', label: 'Contacts', icon: UsersPanel },
     { id: 'deals', label: 'Deals', icon: DollarSign },
-    { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
-    { id: 'activities', label: 'Activities', icon: Activity },
-    { id: 'reports', label: 'Reports', icon: Briefcase },
+    { id: 'pipeline', label: 'Pipeline', icon: TargetPanel },
+    { id: 'activities', label: 'Activities', icon: ActivityPanel },
+    { id: 'reports', label: 'Reports', icon: BarChart3Panel },
   ];
 
   return (
     <aside className="w-64 flex-shrink-0 flex flex-col border-r border-white/5 bg-white/[0.02] h-full">
       <div className="p-6 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00A86B] to-[#1A3A5C] flex items-center justify-center">
-            <TrendingUp className="w-4 h-4 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center">
+            <TargetPanel size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold gradient-text">NovaStrategy</h1>
-            <p className="text-xs text-slate-500">AI Market Intelligence</p>
+            <h1 className="text-lg font-bold gradient-text">NovaMind Insights</h1>
+            <p className="text-xs text-slate-400 mt-0.5">AI-Powered CRM</p>
           </div>
         </div>
       </div>
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
-                activeView === item.id
-                  ? 'bg-white/10 border border-white/10 text-white'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-300'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="text-sm font-medium">{item.label}</span>
-            </button>
-          );
-        })}
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+              activeTab === item.id
+                ? 'bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <item.icon size={18} />
+            <span className="text-sm font-medium">{item.label}</span>
+          </button>
+        ))}
       </nav>
-      <div className="p-4 border-t border-white/5">
-        <div className="glass p-4">
-          <p className="text-xs text-slate-500 mb-1">Active Engagements</p>
-          <p className="text-lg font-bold text-white">24</p>
-          <div className="flex items-center gap-1 mt-1">
-            <span className="text-xs text-[#00A86B]">+3 this week</span>
-          </div>
-        </div>
+      <div className="p-4 border-t border-white/5 space-y-2">
+        <button
+          onClick={() => setShowNewContact(true)}
+          className="w-full flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium transition-all duration-200 hover:shadow-lg"
+        >
+          <PlusPanel size={16} /> New Contact
+        </button>
+        <button
+          onClick={() => setShowNewDeal(true)}
+          className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all duration-200"
+        >
+          <PlusPanel size={16} /> New Deal
+        </button>
       </div>
     </aside>
   );
 }
 
-function TopBar({ title, onAddContact, onAddDeal }) {
+function TopBar({ title }) {
   return (
     <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0">
+      <h2 className="text-lg font-semibold">{title}</h2>
       <div className="flex items-center gap-4">
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-      </div>
-      <div className="flex items-center gap-3">
-        {onAddContact && (
-          <button onClick={onAddContact} className="glass px-4 py-2 text-sm text-white hover:bg-white/10 transition-all duration-200 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Contact
-          </button>
-        )}
-        {onAddDeal && (
-          <button onClick={onAddDeal} className="glass px-4 py-2 text-sm text-white hover:bg-white/10 transition-all duration-200 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Deal
-          </button>
-        )}
+        <div className="relative">
+          <SearchPanel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="SearchPanel anything..."
+            className="w-64 pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all duration-200"
+          />
+        </div>
       </div>
     </header>
   );
 }
 
-function KPICard({ icon: Icon, label, value, delta, positive }) {
+function KPICard({ icon: Icon, label, value, delta, trend }) {
   return (
     <div className="glass p-5 fade-in">
       <div className="flex items-center justify-between mb-3">
-        <div className="p-2 rounded-lg bg-white/5">
-          <Icon className="w-5 h-5 text-[#00A86B]" />
+        <div className="w-10 h-10 rounded-lg bg-[#00B4D8]/10 flex items-center justify-center">
+          <Icon size={20} className="text-[#00B4D8]" />
         </div>
-        {delta !== undefined && (
-          <span className={`text-xs font-medium flex items-center gap-1 ${positive ? 'text-[#00A86B]' : 'text-red-400'}`}>
-            {positive ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {Math.abs(delta)}%
+        {delta && (
+          <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+            trend === 'up' ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'
+          }`}>
+            {trend === 'up' ? <TrendingUpPanel size={12} /> : <TrendingUpPanel size={12} className="rotate-180" />}
+            {delta}
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-white mb-1">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
     </div>
   );
 }
 
-function LineChart() {
-  const data = [30, 45, 38, 52, 48, 60, 55, 70, 65, 80, 75, 90];
-  const max = Math.max(...data);
-  const width = 400;
-  const height = 200;
-  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const xStep = chartWidth / (data.length - 1);
-
-  const points = data.map((d, i) => ({
-    x: padding.left + i * xStep,
-    y: padding.top + chartHeight - (d / max) * chartHeight
-  }));
-
-  const pathD = points.map((p, i) => (i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`)).join(' ');
-  const areaD = pathD + ` L${points[points.length - 1].x},${padding.top + chartHeight} L${points[0].x},${padding.top + chartHeight} Z`;
-
-  return (
-    <svg width={width} height={height} className="w-full h-auto">
-      <defs>
-        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#00A86B" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#00A86B" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaD} fill="url(#lineGrad)" />
-      <path d={pathD} fill="none" stroke="#00A86B" strokeWidth="2" className="animate-[draw_1s_ease-out_forwards]" />
-      <style>{`@keyframes draw { from { stroke-dasharray: 1000; stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }`}</style>
-    </svg>
-  );
-}
-
-function BarChart({ data = [40, 65, 35, 80, 55, 70] }) {
-  const max = Math.max(...data);
-  const barWidth = 40;
-  const spacing = 20;
-  const height = 200;
-  const totalWidth = data.length * (barWidth + spacing);
-
-  return (
-    <svg width={totalWidth} height={height} className="w-full h-auto">
-      <defs>
-        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#00A86B" />
-          <stop offset="100%" stopColor="#1A3A5C" />
-        </linearGradient>
-      </defs>
-      {data.map((d, i) => (
-        <g key={i}>
-          <rect
-            x={i * (barWidth + spacing)}
-            y={height - (d / max) * height}
-            width={barWidth}
-            height={(d / max) * height}
-            fill="url(#barGrad)"
-            rx="4"
-            className="animate-[grow_0.5s_ease-out_forwards]"
-            style={{ animationDelay: `${i * 0.1}s` }}
-          />
-          <text x={i * (barWidth + spacing) + barWidth / 2} y={height - 5} textAnchor="middle" fill="#64748b" fontSize="10">
-            {d}
-          </text>
-        </g>
-      ))}
-      <style>{`@keyframes grow { from { transform: scaleY(0); transform-origin: bottom; } to { transform: scaleY(1); } }`}</style>
-    </svg>
-  );
-}
-
-function DataTable({ columns, data, onRowClick }) {
-  const [sortField, setSortField] = useState(null);
-  const [sortDir, setSortDir] = useState('asc');
-  const [search, setSearch] = useState('');
-
-  const handleSort = useCallback((field) => {
-    setSortDir((prev) => (sortField === field && prev === 'asc' ? 'desc' : 'asc'));
-    setSortField(field);
-  }, [sortField]);
-
-  const filteredData = useMemo(() => {
-    let result = (data || []).filter((row) =>
-      Object.values(row).some((val) => String(val).toLowerCase().includes(search.toLowerCase()))
+function ContactsTable({ contacts, searchTerm, onSort, sortConfig }) {
+  const filtered = useMemo(() => {
+    if (!searchTerm) return contacts;
+    return contacts.filter(c =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.company.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    if (sortField) {
-      result.sort((a, b) => {
-        const aVal = a[sortField];
-        const bVal = b[sortField];
-        if (typeof aVal === 'string') {
-          return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-        }
-        return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-      });
+  }, [contacts, searchTerm]);
+
+  const sorted = useMemo(() => {
+    if (!sortConfig.key) return filtered;
+    return [...filtered].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortConfig]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Active': return 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20';
+      case 'Lead': return 'bg-amber-400/10 text-amber-400 border-amber-400/20';
+      case 'Inactive': return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
+      default: return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
     }
-    return result;
-  }, [data, search, sortField, sortDir]);
+  };
 
   return (
-    <div className="glass p-5">
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00A86B] transition-colors"
-        />
-      </div>
+    <div className="glass overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {columns.map((col) => (
+              {['name', 'company', 'status', 'lastContact', 'owner'].map(col => (
                 <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="text-left py-3 px-4 text-xs font-medium text-slate-500 cursor-pointer hover:text-white transition-colors"
+                  key={col}
+                  onClick={() => onSort(col)}
+                  className="text-left px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                 >
                   <div className="flex items-center gap-1">
-                    {col.label}
-                    {sortField === col.key && (
-                      sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                    {col === 'name' ? 'Name' : col === 'company' ? 'Company' : col === 'status' ? 'Status' : col === 'lastContact' ? 'Last Contact' : 'Owner'}
+                    {sortConfig.key === col && (
+                      sortConfig.direction === 'asc' ? <SortAsc size={12} /> : <SortDesc size={12} />
                     )}
                   </div>
                 </th>
@@ -257,17 +220,36 @@ function DataTable({ columns, data, onRowClick }) {
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((row, i) => (
+            {(sorted || []).map((contact, idx) => (
               <tr
-                key={row.id || i}
-                onClick={() => onRowClick && onRowClick(row)}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                key={contact.id}
+                className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer fade-in"
+                style={{ animationDelay: `${idx * 50}ms` }}
               >
-                {columns.map((col) => (
-                  <td key={col.key} className="py-3 px-4 text-sm text-slate-300">
-                    {row[col.key]}
-                  </td>
-                ))}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center text-xs font-medium">
+                      {contact.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">{contact.name}</p>
+                      <p className="text-xs text-slate-400">{contact.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={14} className="text-slate-500" />
+                    <span className="text-sm text-slate-300">{contact.company}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs px-2.5 py-1 rounded-full border ${getStatusColor(contact.status)}`}>
+                    {contact.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-400">{contact.lastContact}</td>
+                <td className="px-4 py-3 text-sm text-slate-400">{contact.owner}</td>
               </tr>
             ))}
           </tbody>
@@ -277,66 +259,52 @@ function DataTable({ columns, data, onRowClick }) {
   );
 }
 
-function Modal({ isOpen, onClose, title, children }) {
-  if (!isOpen) return null;
+function KanbanBoard({ deals, onSelectDeal }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass p-6 max-w-lg w-full mx-4 fade-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function OpportunityKanban() {
-  const [deals, setDeals] = useState([
-    { id: 1, name: 'TechCorp AI Strategy', value: 450000, stage: 'lead', contact: 'Sarah Chen' },
-    { id: 2, name: 'FinData Migration', value: 320000, stage: 'lead', contact: 'Mike Johnson' },
-    { id: 3, name: 'HealthPlus Analytics', value: 280000, stage: 'qualified', contact: 'Emily Davis' },
-    { id: 4, name: 'RetailMax Omnichannel', value: 520000, stage: 'qualified', contact: 'James Wilson' },
-    { id: 5, name: 'GreenEnergy Advisory', value: 410000, stage: 'proposal', contact: 'Lisa Brown' },
-    { id: 6, name: 'CloudSync Integration', value: 380000, stage: 'proposal', contact: 'David Lee' },
-    { id: 7, name: 'AutoInnovate Strategy', value: 610000, stage: 'won', contact: 'Anna Kim' },
-    { id: 8, name: 'BioGen Research', value: 290000, stage: 'won', contact: 'Tom Harris' },
-  ]);
-
-  const columns = [
-    { id: 'lead', label: 'Lead', color: '#64748b' },
-    { id: 'qualified', label: 'Qualified', color: '#3b82f6' },
-    { id: 'proposal', label: 'Proposal', color: '#f59e0b' },
-    { id: 'won', label: 'Won', color: '#00A86B' },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-full">
-      {columns.map((col) => {
-        const columnDeals = deals.filter((d) => d.stage === col.id);
+    <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '400px' }}>
+      {PIPELINE_COLUMNS.map((column, colIdx) => {
+        const columnDeals = (deals || []).filter(d => d.stage === column);
         return (
-          <div key={col.id} className="glass p-4 min-h-[400px]">
-            <div className="flex items-center justify-between mb-4">
+          <div key={column} className="flex-1 min-w-[280px]">
+            <div className="flex items-center justify-between mb-3 px-1">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
-                <h3 className="text-sm font-medium text-white">{col.label}</h3>
+                <div className={`w-2 h-2 rounded-full ${
+                  column === 'Lead' ? 'bg-slate-400' :
+                  column === 'Qualified' ? 'bg-amber-400' :
+                  column === 'Proposal' ? 'bg-blue-400' : 'bg-emerald-400'
+                }`} />
+                <span className="text-sm font-medium text-slate-300">{column}</span>
+                <span className="text-xs text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">{columnDeals.length}</span>
               </div>
-              <span className="text-xs text-slate-500">{columnDeals.length}</span>
             </div>
             <div className="space-y-3">
-              {columnDeals.map((deal) => (
-                <div key={deal.id} className="glass p-3 hover:bg-white/10 transition-all duration-200 cursor-pointer">
-                  <h4 className="text-sm font-medium text-white mb-2">{deal.name}</h4>
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-3 h-3 text-[#00A86B]" />
-                    <span className="text-xs text-slate-400">${deal.value.toLocaleString()}</span>
+              {(columnDeals || []).map((deal, cardIdx) => (
+                <div
+                  key={deal.id}
+                  onClick={() => onSelectDeal(deal)}
+                  className="glass p-4 cursor-pointer kanban-card fade-in"
+                  style={{ animationDelay: `${cardIdx * 100}ms` }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="text-sm font-medium text-white">{deal.name}</h4>
+                    <span className="text-xs text-slate-400">{deal.company}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <User className="w-3 h-3 text-slate-500" />
-                    <span className="text-xs text-slate-500">{deal.contact}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
+                          style={{ width: `${deal.probability}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-500">{deal.probability}%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                    <span className="text-xs text-slate-500">{deal.owner}</span>
+                    <span className="text-xs text-slate-500">•</span>
+                    <span className="text-xs text-slate-500">{deal.nextAction}</span>
                   </div>
                 </div>
               ))}
@@ -348,290 +316,315 @@ function OpportunityKanban() {
   );
 }
 
-function ActivityFeed() {
-  const activities = [
-    { id: 1, type: 'call', title: 'Discovery Call - TechCorp', time: '2 hours ago', description: 'Discussed AI strategy requirements' },
-    { id: 2, type: 'email', title: 'Proposal sent to FinData', time: '4 hours ago', description: 'Sent detailed market entry proposal' },
-    { id: 3, type: 'meeting', title: 'Strategy Workshop - HealthPlus', time: '1 day ago', description: '3-hour workshop on analytics framework' },
-    { id: 4, type: 'call', title: 'Follow-up with RetailMax', time: '2 days ago', description: 'Discussed omnichannel implementation' },
-    { id: 5, type: 'email', title: 'Resource allocation plan', time: '3 days ago', description: 'Sent team structure for GreenEnergy' },
-  ];
-
-  const getIcon = (type) => {
+function ActivityFeed({ activities }) {
+  const getActivityIcon = (type) => {
     switch (type) {
-      case 'call': return <Phone className="w-4 h-4 text-[#00A86B]" />;
-      case 'email': return <Mail className="w-4 h-4 text-blue-400" />;
-      case 'meeting': return <Calendar className="w-4 h-4 text-yellow-400" />;
-      default: return <Clock className="w-4 h-4 text-slate-400" />;
+      case 'call': return { icon: PhonePanel, color: 'text-emerald-400 bg-emerald-400/10' };
+      case 'email': return { icon: MailPanel, color: 'text-blue-400 bg-blue-400/10' };
+      case 'meeting': return { icon: CalendarPanel, color: 'text-amber-400 bg-amber-400/10' };
+      default: return { icon: MessageSquarePanel, color: 'text-slate-400 bg-slate-400/10' };
     }
   };
 
   return (
     <div className="space-y-4">
-      {activities.map((activity) => (
-        <div key={activity.id} className="glass p-4 fade-in flex items-start gap-4">
-          <div className="p-2 rounded-lg bg-white/5">{getIcon(activity.type)}</div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-medium text-white">{activity.title}</h4>
-              <span className="text-xs text-slate-500">{activity.time}</span>
+      {(activities || []).map((activity, idx) => {
+        const { icon: Icon, color } = getActivityIcon(activity.type);
+        return (
+          <div key={activity.id} className="flex gap-4 fade-in" style={{ animationDelay: `${idx * 100}ms` }}>
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center`}>
+                <Icon size={16} />
+              </div>
+              {idx < activities.length - 1 && <div className="w-px flex-1 bg-white/5 my-2" />}
             </div>
-            <p className="text-xs text-slate-400">{activity.description}</p>
+            <div className="flex-1 pb-6">
+              <div className="glass p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-white">{activity.description}</span>
+                  <span className="text-xs text-slate-500">{activity.date}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <UsersPanel size={12} />
+                    {activity.contact}
+                  </span>
+                  {activity.duration && (
+                    <span className="flex items-center gap-1">
+                      <ClockPanel size={12} />
+                      {activity.duration}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-export default function App() {
-  useInjectStyles();
-  const [activeView, setActiveView] = useState('contacts');
-  const [contactsModalOpen, setContactsModalOpen] = useState(false);
-  const [dealsModalOpen, setDealsModalOpen] = useState(false);
-  const [toast, setToast] = useState(null);
+function DealModal({ deal, onClose }) {
+  if (!deal) return null;
 
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
+  const stageColors = {
+    Lead: 'from-slate-400 to-slate-500',
+    Qualified: 'from-amber-400 to-amber-500',
+    Proposal: 'from-blue-400 to-blue-500',
+    Won: 'from-emerald-400 to-emerald-500',
+  };
 
-  const contactsColumns = [
-    { key: 'name', label: 'Name' },
-    { key: 'company', label: 'Company' },
-    { key: 'status', label: 'Status' },
-    { key: 'lastContact', label: 'Last Contact' },
-  ];
+  return (
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-lg mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white">{deal.name}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Value</span>
+            <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Stage</span>
+            <span className={`text-sm font-medium px-3 py-1 rounded-full bg-gradient-to-r ${stageColors[deal.stage]} text-white`}>
+              {deal.stage}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Owner</span>
+            <span className="text-sm text-white">{deal.owner}</span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Probability</span>
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
+                  style={{ width: `${deal.probability}%` }}
+                />
+              </div>
+              <span className="text-sm text-white">{deal.probability}%</span>
+            </div>
+          </div>
+          <div className="p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400 block mb-1">Next Action</span>
+            <span className="text-sm text-white flex items-center gap-2">
+              <ChevronRightPanel size={14} className="text-[#00B4D8]" />
+              {deal.nextAction}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <span className="text-sm text-slate-400">Company</span>
+            <span className="text-sm text-white">{deal.company}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const contactsData = [
-    { id: 1, name: 'Sarah Chen', company: 'TechCorp Industries', status: 'Active', lastContact: '2 days ago' },
-    { id: 2, name: 'Mike Johnson', company: 'FinData Solutions', status: 'New', lastContact: 'Today' },
-    { id: 3, name: 'Emily Davis', company: 'HealthPlus Corp', status: 'Active', lastContact: '1 week ago' },
-    { id: 4, name: 'James Wilson', company: 'RetailMax Group', status: 'Inactive', lastContact: '1 month ago' },
-    { id: 5, name: 'Lisa Brown', company: 'GreenEnergy Ltd', status: 'Active', lastContact: '3 days ago' },
-    { id: 6, name: 'David Lee', company: 'CloudSync Tech', status: 'New', lastContact: 'Yesterday' },
-  ];
+function NewContactForm({ onClose, onSubmit }) {
+  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', status: 'Lead' });
+  const [errors, setErrors] = useState({});
 
-  const [newContact, setNewContact] = useState({ name: '', company: '', email: '', phone: '' });
-  const [newDeal, setNewDeal] = useState({ name: '', value: '', company: '', stage: 'lead' });
+  const validate = () => {
+    const newErrors = {};
+    if (!form.name.trim()) newErrors.name = 'Name is required';
+    if (!form.company.trim()) newErrors.company = 'Company is required';
+    if (!form.email.trim()) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email format';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-  const handleAddContact = useCallback((e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!newContact.name || !newContact.company || !newContact.email) {
-      showToast('Please fill in all required fields', 'error');
-      return;
-    }
-    showToast('Contact added successfully!');
-    setContactsModalOpen(false);
-    setNewContact({ name: '', company: '', email: '', phone: '' });
-  }, [newContact, showToast]);
-
-  const handleAddDeal = useCallback((e) => {
-    e.preventDefault();
-    if (!newDeal.name || !newDeal.value || !newDeal.company) {
-      showToast('Please fill in all required fields', 'error');
-      return;
-    }
-    showToast('Deal created successfully!');
-    setDealsModalOpen(false);
-    setNewDeal({ name: '', value: '', company: '', stage: 'lead' });
-  }, [newDeal, showToast]);
-
-  const renderView = () => {
-    switch (activeView) {
-      case 'contacts':
-        return (
-          <>
-            <TopBar title="Contacts" onAddContact={() => setContactsModalOpen(true)} />
-            <main className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <KPICard icon={Users} label="Total Contacts" value="6,245" delta={12} positive />
-                <KPICard icon={Building2} label="Active Clients" value="234" delta={8} positive />
-                <KPICard icon={Phone} label="Calls This Week" value="89" delta={5} positive />
-                <KPICard icon={Mail} label="Emails Sent" value="1,342" delta={3} positive={false} />
-              </div>
-              <DataTable columns={contactsColumns} data={contactsData} onRowClick={(row) => showToast(`Viewing ${row.name}`)} />
-            </main>
-          </>
-        );
-      case 'deals':
-        return (
-          <>
-            <TopBar title="Deals" onAddDeal={() => setDealsModalOpen(true)} />
-            <main className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <KPICard icon={DollarSign} label="Total Pipeline Value" value="$3.26M" delta={15} positive />
-                <KPICard icon={TrendingUp} label="Active Deals" value="28" delta={10} positive />
-                <KPICard icon={Flag} label="Won This Quarter" value="$1.2M" delta={25} positive />
-                <KPICard icon={Clock} label="Avg. Deal Cycle" value="45 days" delta={8} positive />
-              </div>
-              <div className="glass p-5 mb-6">
-                <h3 className="text-sm font-medium text-white mb-4">Revenue Forecast</h3>
-                <BarChart />
-              </div>
-              <div className="glass p-5">
-                <h3 className="text-sm font-medium text-white mb-4">Deal Performance</h3>
-                <LineChart />
-              </div>
-            </main>
-          </>
-        );
-      case 'pipeline':
-        return (
-          <>
-            <TopBar title="Pipeline" />
-            <main className="flex-1 overflow-y-auto p-6">
-              <OpportunityKanban />
-            </main>
-          </>
-        );
-      case 'activities':
-        return (
-          <>
-            <TopBar title="Activities" />
-            <main className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <KPICard icon={Phone} label="Calls" value="45" delta={8} positive />
-                <KPICard icon={Mail} label="Emails" value="127" delta={3} positive={false} />
-                <KPICard icon={Calendar} label="Meetings" value="12" delta={20} positive />
-                <KPICard icon={Clock} label="Tasks Completed" value="89" delta={5} positive />
-              </div>
-              <ActivityFeed />
-            </main>
-          </>
-        );
-      case 'reports':
-        return (
-          <>
-            <TopBar title="Reports" />
-            <main className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <KPICard icon={Briefcase} label="Total Revenue" value="$4.8M" delta={22} positive />
-                <KPICard icon={TrendingUp} label="Growth Rate" value="18.5%" delta={3} positive />
-                <KPICard icon={Users} label="Client Retention" value="94%" delta={2} positive />
-                <KPICard icon={DollarSign} label="Avg. Deal Size" value="$165K" delta={7} positive />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="glass p-5">
-                  <h3 className="text-sm font-medium text-white mb-4">Quarterly Revenue</h3>
-                  <BarChart data={[250, 400, 350, 520, 480, 600]} />
-                </div>
-                <div className="glass p-5">
-                  <h3 className="text-sm font-medium text-white mb-4">Client Acquisition</h3>
-                  <LineChart />
-                </div>
-              </div>
-            </main>
-          </>
-        );
-      default:
-        return null;
+    if (validate()) {
+      onSubmit({ ...form, id: Date.now(), lastContact: new Date().toISOString().split('T')[0], owner: 'Current User' });
+      onClose();
     }
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#06080f] text-slate-100">
-      <Sidebar activeView={activeView} setActiveView={setActiveView} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {renderView()}
-      </div>
-
-      <Modal isOpen={contactsModalOpen} onClose={() => setContactsModalOpen(false)} title="Add New Contact">
-        <form onSubmit={handleAddContact} className="space-y-4">
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <UsersPanel size={20} className="text-[#00B4D8]" />
+            New Contact
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Name *</label>
+            <label className="block text-sm text-slate-400 mb-1">Name</label>
             <input
               type="text"
-              value={newContact.name}
-              onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Full name"
             />
+            {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Company *</label>
+            <label className="block text-sm text-slate-400 mb-1">Company</label>
             <input
               type="text"
-              value={newContact.company}
-              onChange={(e) => setNewContact({ ...newContact, company: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
+              value={form.company}
+              onChange={e => setForm({ ...form, company: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Company name"
             />
+            {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Email *</label>
+            <label className="block text-sm text-slate-400 mb-1">Email</label>
             <input
               type="email"
-              value={newContact.email}
-              onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.email ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="email@company.com"
             />
+            {errors.email && <p className="text-xs text-red-400 mt-1">{errors.email}</p>}
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Phone</label>
-            <input
-              type="tel"
-              value={newContact.phone}
-              onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
-            />
-          </div>
-          <button type="submit" className="w-full py-2 bg-[#00A86B] rounded-lg text-sm font-medium text-white hover:bg-[#00A86B]/90 transition-colors">
-            Add Contact
-          </button>
-        </form>
-      </Modal>
-
-      <Modal isOpen={dealsModalOpen} onClose={() => setDealsModalOpen(false)} title="Create New Deal">
-        <form onSubmit={handleAddDeal} className="space-y-4">
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Deal Name *</label>
+            <label className="block text-sm text-slate-400 mb-1">PhonePanel</label>
             <input
               type="text"
-              value={newDeal.name}
-              onChange={(e) => setNewDeal({ ...newDeal, name: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
+              value={form.phone}
+              onChange={e => setForm({ ...form, phone: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+              placeholder="+1-555-0123"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Value *</label>
-            <input
-              type="number"
-              value={newDeal.value}
-              onChange={(e) => setNewDeal({ ...newDeal, value: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Company *</label>
-            <input
-              type="text"
-              value={newDeal.company}
-              onChange={(e) => setNewDeal({ ...newDeal, company: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Stage</label>
+            <label className="block text-sm text-slate-400 mb-1">Status</label>
             <select
-              value={newDeal.stage}
-              onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#00A86B]"
+              value={form.status}
+              onChange={e => setForm({ ...form, status: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
             >
-              <option value="lead">Lead</option>
-              <option value="qualified">Qualified</option>
-              <option value="proposal">Proposal</option>
+              <option value="Lead">Lead</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
             </select>
           </div>
-          <button type="submit" className="w-full py-2 bg-[#00A86B] rounded-lg text-sm font-medium text-white hover:bg-[#00A86B]/90 transition-colors">
-            Create Deal
-          </button>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+            >
+              Create Contact
+            </button>
+          </div>
         </form>
-      </Modal>
-
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 glass px-6 py-3 fade-in">
-          <p className={`text-sm ${toast.type === 'error' ? 'text-red-400' : 'text-[#00A86B]'}`}>{toast.message}</p>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
+
+function NewDealForm({ onClose, onSubmit }) {
+  const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'Lead' });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const newErrors = {};
+    if (!form.name.trim()) newErrors.name = 'Deal name is required';
+    if (!form.company.trim()) newErrors.company = 'Company is required';
+    if (!form.value || form.value <= 0) newErrors.value = 'Value must be a positive number';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validate()) {
+      onSubmit({
+        ...form,
+        id: Date.now(),
+        value: Number(form.value),
+        owner: 'Current User',
+        probability: form.stage === 'Lead' ? 25 : form.stage === 'Qualified' ? 50 : form.stage === 'Proposal' ? 75 : 100,
+        nextAction: 'Pending review',
+      });
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <DollarSign size={20} className="text-[#00B4D8]" />
+            New Deal
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
+            <XPanel size={18} className="text-slate-400" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Deal Name</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Enter deal name"
+            />
+            {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Company</label>
+            <input
+              type="text"
+              value={form.company}
+              onChange={e => setForm({ ...form, company: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Company name"
+            />
+            {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Value ($)</label>
+            <input
+              type="number"
+              value={form.value}
+              onChange={e => setForm({ ...form, value: e.target.value })}
+              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.value ? 'border-red-400/50' : 'border-white/10'}`}
+              placeholder="Deal value"
+              min="0"
+            />
+            {errors.value && <p className="text-xs text-red-400 mt-1">{errors.value}</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Stage</label>
+            <select
+              value={form.stage}
+              onChange={e => setForm({ ...form, stage: e.target.value })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+            >
+              <option value="Lead">Lead</option>
+              <option value="Qualified">Qualified</option>
+              <option value="Proposal">Proposal</option>
+              <option value="Won">Won</option>
+            </select>
+          </div>
+          <div
