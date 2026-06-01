@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
@@ -7,14 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import random
+import enum
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-COMPANY_SLUG = os.environ.get("COMPANY_SLUG", "nova_consulting")
+COMPANY_SLUG = os.environ.get("COMPANY_SLUG", "novamind")
+PORT = int(os.environ.get("COMPANY_PORT", 8000))
+
 db_engine = None
 SessionLocal = None
 
+
 class Base(DeclarativeBase):
     pass
+
 
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
@@ -22,9 +27,498 @@ if DATABASE_URL:
     db_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     SessionLocal = sessionmaker(bind=db_engine)
 
-PORT = int(os.environ.get("COMPANY_PORT", 8000))
 
-app = FastAPI(title="NovaMind Insights", version="1.0.0")
+# --- Database Models ---
+class UserModel(Base):
+    __tablename__ = f"{COMPANY_SLUG}_users"
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    department = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ClientModel(Base):
+    __tablename__ = f"{COMPANY_SLUG}_clients"
+    
+    id = Column(String, primary_key=True)
+    company_name = Column(String, nullable=False)
+    industry = Column(String, nullable=False)
+    revenue_range = Column(String, nullable=False)
+    region = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    assigned_user_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ProjectModel(Base):
+    __tablename__ = f"{COMPANY_SLUG}_projects"
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    client_id = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    budget = Column(Float, nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=True)
+    lead_analyst_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AnalysisModel(Base):
+    __tablename__ = f"{COMPANY_SLUG}_analyses"
+    
+    id = Column(String, primary_key=True)
+    project_id = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, nullable=False)
+    confidence_score = Column(Float, nullable=True)
+    key_findings = Column(Text, nullable=True)
+    created_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ReportModel(Base):
+    __tablename__ = f"{COMPANY_SLUG}_reports"
+    
+    id = Column(String, primary_key=True)
+    project_id = Column(String, nullable=False)
+    analysis_id = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    executive_summary = Column(Text, nullable=True)
+    recommendations = Column(Text, nullable=True)
+    generated_by = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+
+# --- Mock Data ---
+MOCK_USERS = [
+    {
+        "id": "usr_001",
+        "name": "Dr. Sarah Chen",
+        "email": "sarah.chen@novamind.ai",
+        "role": "Chief AI Strategist",
+        "department": "Strategy",
+        "created_at": "2024-01-15T09:00:00"
+    },
+    {
+        "id": "usr_002",
+        "name": "James Rodriguez",
+        "email": "james.rodriguez@novamind.ai",
+        "role": "Senior Data Analyst",
+        "department": "Analytics",
+        "created_at": "2024-02-01T10:00:00"
+    },
+    {
+        "id": "usr_003",
+        "name": "Emily Nakamura",
+        "email": "emily.nakamura@novamind.ai",
+        "role": "Market Research Lead",
+        "department": "Research",
+        "created_at": "2024-02-15T11:00:00"
+    },
+    {
+        "id": "usr_004",
+        "name": "Marcus Williams",
+        "email": "marcus.williams@novamind.ai",
+        "role": "AI Implementation Specialist",
+        "department": "Technology",
+        "created_at": "2024-03-01T08:00:00"
+    },
+    {
+        "id": "usr_005",
+        "name": "Olivia Patel",
+        "email": "olivia.patel@novamind.ai",
+        "role": "Client Success Director",
+        "department": "Client Relations",
+        "created_at": "2024-03-10T09:30:00"
+    },
+    {
+        "id": "usr_006",
+        "name": "Dr. Robert Kim",
+        "email": "robert.kim@novamind.ai",
+        "role": "Data Science Lead",
+        "department": "Analytics",
+        "created_at": "2024-03-20T10:00:00"
+    }
+]
+
+MOCK_CLIENTS = [
+    {
+        "id": "cli_001",
+        "company_name": "GlobalTech Industries",
+        "industry": "Technology",
+        "revenue_range": "$10B-$50B",
+        "region": "North America",
+        "status": "active",
+        "assigned_user_id": "usr_001",
+        "created_at": "2024-01-20T09:00:00"
+    },
+    {
+        "id": "cli_002",
+        "company_name": "EuroFinance Group",
+        "industry": "Financial Services",
+        "revenue_range": "$5B-$20B",
+        "region": "Europe",
+        "status": "active",
+        "assigned_user_id": "usr_005",
+        "created_at": "2024-02-05T10:00:00"
+    },
+    {
+        "id": "cli_003",
+        "company_name": "Pacific Health Systems",
+        "industry": "Healthcare",
+        "revenue_range": "$3B-$15B",
+        "region": "Asia Pacific",
+        "status": "active",
+        "assigned_user_id": "usr_003",
+        "created_at": "2024-02-18T11:00:00"
+    },
+    {
+        "id": "cli_004",
+        "company_name": "RetailMax Corporation",
+        "industry": "Retail",
+        "revenue_range": "$2B-$10B",
+        "region": "North America",
+        "status": "onboarding",
+        "assigned_user_id": "usr_005",
+        "created_at": "2024-03-05T09:00:00"
+    },
+    {
+        "id": "cli_005",
+        "company_name": "GreenEnergy Solutions",
+        "industry": "Energy",
+        "revenue_range": "$1B-$5B",
+        "region": "Europe",
+        "status": "proposal",
+        "assigned_user_id": "usr_001",
+        "created_at": "2024-03-15T10:00:00"
+    },
+    {
+        "id": "cli_006",
+        "company_name": "AeroSpace Dynamics",
+        "industry": "Aerospace",
+        "revenue_range": "$8B-$30B",
+        "region": "North America",
+        "status": "active",
+        "assigned_user_id": "usr_002",
+        "created_at": "2024-03-22T11:00:00"
+    },
+    {
+        "id": "cli_007",
+        "company_name": "MediTech Innovations",
+        "industry": "Healthcare Technology",
+        "revenue_range": "$500M-$2B",
+        "region": "Europe",
+        "status": "onboarding",
+        "assigned_user_id": "usr_003",
+        "created_at": "2024-04-01T09:00:00"
+    }
+]
+
+MOCK_PROJECTS = [
+    {
+        "id": "prj_001",
+        "name": "Global Market Entry Strategy - APAC",
+        "client_id": "cli_001",
+        "type": "Market Entry",
+        "status": "in_progress",
+        "budget": 2500000.00,
+        "start_date": "2024-03-01T00:00:00",
+        "end_date": "2024-09-30T00:00:00",
+        "lead_analyst_id": "usr_001",
+        "created_at": "2024-02-15T09:00:00"
+    },
+    {
+        "id": "prj_002",
+        "name": "AI-Driven Cost Optimization",
+        "client_id": "cli_002",
+        "type": "Operational Efficiency",
+        "status": "in_progress",
+        "budget": 1800000.00,
+        "start_date": "2024-03-15T00:00:00",
+        "end_date": "2024-10-15T00:00:00",
+        "lead_analyst_id": "usr_006",
+        "created_at": "2024-02-28T10:00:00"
+    },
+    {
+        "id": "prj_003",
+        "name": "Healthcare Digital Transformation",
+        "client_id": "cli_003",
+        "type": "Digital Transformation",
+        "status": "planning",
+        "budget": 3200000.00,
+        "start_date": "2024-04-01T00:00:00",
+        "end_date": "2025-03-31T00:00:00",
+        "lead_analyst_id": "usr_003",
+        "created_at": "2024-03-10T11:00:00"
+    },
+    {
+        "id": "prj_004",
+        "name": "Retail Analytics Platform",
+        "client_id": "cli_004",
+        "type": "Technology Implementation",
+        "status": "planning",
+        "budget": 1500000.00,
+        "start_date": "2024-05-01T00:00:00",
+        "end_date": "2024-12-31T00:00:00",
+        "lead_analyst_id": "usr_004",
+        "created_at": "2024-03-20T09:00:00"
+    },
+    {
+        "id": "prj_005",
+        "name": "Renewable Energy Market Analysis",
+        "client_id": "cli_005",
+        "type": "Market Research",
+        "status": "proposal",
+        "budget": 800000.00,
+        "start_date": "2024-06-01T00:00:00",
+        "end_date": "2024-11-30T00:00:00",
+        "lead_analyst_id": "usr_002",
+        "created_at": "2024-04-01T10:00:00"
+    },
+    {
+        "id": "prj_006",
+        "name": "Supply Chain AI Optimization",
+        "client_id": "cli_006",
+        "type": "AI Implementation",
+        "status": "in_progress",
+        "budget": 2800000.00,
+        "start_date": "2024-02-01T00:00:00",
+        "end_date": "2024-11-30T00:00:00",
+        "lead_analyst_id": "usr_004",
+        "created_at": "2024-01-20T11:00:00"
+    },
+    {
+        "id": "prj_007",
+        "name": "MedTech Go-to-Market Strategy",
+        "client_id": "cli_007",
+        "type": "Market Entry",
+        "status": "planning",
+        "budget": 1200000.00,
+        "start_date": "2024-05-15T00:00:00",
+        "end_date": "2025-02-28T00:00:00",
+        "lead_analyst_id": "usr_003",
+        "created_at": "2024-04-10T09:00:00"
+    }
+]
+
+MOCK_ANALYSES = [
+    {
+        "id": "anl_001",
+        "project_id": "prj_001",
+        "type": "Competitive Landscape",
+        "description": "Deep analysis of competitors in Southeast Asian markets",
+        "status": "completed",
+        "confidence_score": 0.92,
+        "key_findings": "Three major competitors identified; market gap in mid-tier pricing",
+        "created_by": "usr_002",
+        "created_at": "2024-03-20T14:00:00"
+    },
+    {
+        "id": "anl_002",
+        "project_id": "prj_001",
+        "type": "Customer Segmentation",
+        "description": "AI-driven customer segmentation for APAC markets",
+        "status": "in_progress",
+        "confidence_score": 0.85,
+        "key_findings": "Four distinct segments identified; premium segment shows 40% growth potential",
+        "created_by": "usr_003",
+        "created_at": "2024-04-05T10:00:00"
+    },
+    {
+        "id": "anl_003",
+        "project_id": "prj_002",
+        "type": "Process Mining",
+        "description": "Analyzing operational workflows for AI optimization opportunities",
+        "status": "completed",
+        "confidence_score": 0.88,
+        "key_findings": "32% reduction potential in operational costs through AI automation",
+        "created_by": "usr_006",
+        "created_at": "2024-03-28T09:00:00"
+    },
+    {
+        "id": "anl_004",
+        "project_id": "prj_003",
+        "type": "Technology Assessment",
+        "description": "Evaluating current tech stack for digital transformation readiness",
+        "status": "completed",
+        "confidence_score": 0.90,
+        "key_findings": "Legacy system migration needed; recommended cloud-native architecture",
+        "created_by": "usr_004",
+        "created_at": "2024-04-01T11:00:00"
+    },
+    {
+        "id": "anl_005",
+        "project_id": "prj_006",
+        "type": "Supply Chain Analytics",
+        "description": "AI-powered supply chain optimization analysis",
+        "status": "completed",
+        "confidence_score": 0.94,
+        "key_findings": "18% improvement in logistics efficiency achievable with ML routing",
+        "created_by": "usr_002",
+        "created_at": "2024-03-15T15:00:00"
+    },
+    {
+        "id": "anl_006",
+        "project_id": "prj_006",
+        "type": "Predictive Maintenance",
+        "description": "AI models for predicting equipment maintenance needs",
+        "status": "in_progress",
+        "confidence_score": 0.82,
+        "key_findings": "Predictive accuracy at 87%; potential for 25% reduction in downtime",
+        "created_by": "usr_006",
+        "created_at": "2024-04-08T13:00:00"
+    },
+    {
+        "id": "anl_007",
+        "project_id": "prj_001",
+        "type": "Regulatory Analysis",
+        "description": "Compliance and regulatory landscape assessment for APAC entry",
+        "status": "completed",
+        "confidence_score": 0.91,
+        "key_findings": "Moderate regulatory barriers; data localization requirements in 3 countries",
+        "created_by": "usr_001",
+        "created_at": "2024-04-10T08:00:00"
+    }
+]
+
+MOCK_REPORTS = [
+    {
+        "id": "rpt_001",
+        "project_id": "prj_001",
+        "analysis_id": "anl_001",
+        "title": "Competitive Landscape Report: Southeast Asia",
+        "status": "final",
+        "executive_summary": "Comprehensive analysis reveals significant market opportunity in emerging economies of Southeast Asia, with projected CAGR of 15.2% over next 3 years.",
+        "recommendations": "Focus on mid-market segment first; leverage partnerships with local distributors; invest in localized AI solutions",
+        "generated_by": "usr_001",
+        "generated_at": "2024-04-01T16:00:00"
+    },
+    {
+        "id": "rpt_002",
+        "project_id": "prj_002",
+        "analysis_id": "anl_003",
+        "title": "Operational Efficiency Optimization Report",
+        "status": "final",
+        "executive_summary": "AI-driven process mining identified $580M in annual cost savings opportunities across 12 key operational areas.",
+        "recommendations": "Implement RPA in 6 high-impact processes; deploy ML-based demand forecasting; automate invoice processing",
+        "generated_by": "usr_006",
+        "generated_at": "2024-04-10T14:00:00"
+    },
+    {
+        "id": "rpt_003",
+        "project_id": "prj_003",
+        "analysis_id": "anl_004",
+        "title": "Digital Transformation Readiness Assessment",
+        "status": "draft",
+        "executive_summary": "Organization shows 65% digital maturity score; critical gaps identified in data infrastructure and workforce skills.",
+        "recommendations": "Phased migration to cloud; invest in data lakes; comprehensive training program for 2,000 employees",
+        "generated_by": "usr_004",
+        "generated_at": "2024-04-15T11:00:00"
+    },
+    {
+        "id": "rpt_004",
+        "project_id": "prj_006",
+        "analysis_id": "anl_005",
+        "title": "Supply Chain AI Optimization: Phase 1 Results",
+        "status": "final",
+        "executive_summary": "Initial AI implementation shows 12% cost reduction in logistics operations with full-scale rollout projected to achieve 18% savings.",
+        "recommendations": "Expand ML routing to all distribution centers; integrate real-time demand sensing; automated supplier selection",
+        "generated_by": "usr_002",
+        "generated_at": "2024-04-05T09:00:00"
+    },
+    {
+        "id": "rpt_005",
+        "project_id": "prj_001",
+        "analysis_id": "anl_007",
+        "title": "APAC Regulatory Compliance Analysis",
+        "status": "final",
+        "executive_summary": "Regulatory environment ranges from favorable (Singapore, Vietnam) to restrictive (China, India). Data sovereignty and AI ethics laws pose key challenges.",
+        "recommendations": "Establish local data centers in key markets; partner with regional compliance firms; develop AI ethics framework",
+        "generated_by": "usr_001",
+        "generated_at": "2024-04-18T15:00:00"
+    },
+    {
+        "id": "rpt_006",
+        "project_id": "prj_002",
+        "analysis_id": "anl_003",
+        "title": "Quarterly Performance Dashboard",
+        "status": "draft",
+        "executive_summary": "Q1 2024 performance exceeds targets by 15% in cost reduction initiatives; customer satisfaction score at 4.2/5.0.",
+        "recommendations": "Scale successful automation to additional departments; invest in customer success team; Q2 target: 22% cost reduction",
+        "generated_by": "usr_006",
+        "generated_at": "2024-04-20T13:00:00"
+    },
+    {
+        "id": "rpt_007",
+        "project_id": "prj_001",
+        "analysis_id": "anl_002",
+        "title": "APAC Customer Segmentation Analysis",
+        "status": "draft",
+        "executive_summary": "Preliminary segmentation identifies 4 primary customer personas with distinct needs and willingness to pay for AI-powered solutions.",
+        "recommendations": "Develop targeted marketing campaigns for each segment; premium pricing strategy for enterprise tier",
+        "generated_by": "usr_003",
+        "generated_at": "2024-04-22T10:00:00"
+    }
+]
+
+
+# --- Pydantic Models ---
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    role: str
+    department: str
+
+
+class ClientCreate(BaseModel):
+    company_name: str
+    industry: str
+    revenue_range: str
+    region: str
+    status: str = "proposal"
+    assigned_user_id: str = None
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    client_id: str
+    type: str
+    status: str = "planning"
+    budget: float
+    start_date: str
+    end_date: str = None
+    lead_analyst_id: str = None
+
+
+class AnalysisCreate(BaseModel):
+    project_id: str
+    type: str
+    description: str = None
+    status: str = "planned"
+    confidence_score: float = None
+    key_findings: str = None
+    created_by: str = None
+
+
+class ReportCreate(BaseModel):
+    project_id: str
+    analysis_id: str
+    title: str
+    status: str = "draft"
+    executive_summary: str = None
+    recommendations: str = None
+    generated_by: str = None
+
+
+# --- FastAPI App ---
+app = FastAPI(title="NovaMind AI", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,149 +527,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define Models
-class Contact(Base):
-    __tablename__ = f"{COMPANY_SLUG}_contacts"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    email = Column(String(255), nullable=False)
-    phone = Column(String(50))
-    company_id = Column(Integer, nullable=False)
-    position = Column(String(255))
-    industry = Column(String(255))
-    status = Column(String(50), default="active")
-    created_at = Column(DateTime, default=datetime.utcnow)
 
-class Deal(Base):
-    __tablename__ = f"{COMPANY_SLUG}_deals"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    value = Column(Float, nullable=False)
-    stage = Column(String(100), nullable=False)
-    company_id = Column(Integer, nullable=False)
-    contact_id = Column(Integer, nullable=False)
-    probability = Column(Integer, default=50)
-    expected_close_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
+@app.on_event("startup")
+async def startup():
+    if db_engine:
+        Base.metadata.create_all(db_engine)
 
-class Company(Base):
-    __tablename__ = f"{COMPANY_SLUG}_companies"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    industry = Column(String(255))
-    size = Column(String(100))
-    revenue = Column(Float)
-    location = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
 
-class Interaction(Base):
-    __tablename__ = f"{COMPANY_SLUG}_interactions"
-    id = Column(Integer, primary_key=True, index=True)
-    contact_id = Column(Integer, nullable=False)
-    deal_id = Column(Integer)
-    type = Column(String(100), nullable=False)
-    notes = Column(Text)
-    outcome = Column(String(255))
-    date = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-class Report(Base):
-    __tablename__ = f"{COMPANY_SLUG}_reports"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    type = Column(String(100), nullable=False)
-    data = Column(Text)
-    generated_for = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-# Create tables on startup
-if db_engine:
-    Base.metadata.create_all(bind=db_engine)
-
-# Pydantic models
-class ContactCreate(BaseModel):
-    name: str
-    email: str
-    phone: str = ""
-    company_id: int = 0
-    position: str = ""
-    industry: str = ""
-    status: str = "active"
-
-class DealCreate(BaseModel):
-    name: str
-    value: float
-    stage: str
-    company_id: int
-    contact_id: int
-    probability: int = 50
-    expected_close_date: str = ""
-
-class InteractionCreate(BaseModel):
-    contact_id: int
-    deal_id: int = 0
-    type: str
-    notes: str = ""
-    outcome: str = ""
-
-class ReportCreate(BaseModel):
-    name: str
-    type: str
-    data: str = ""
-    generated_for: str = ""
-
-# Mock Data
-MOCK_CONTACTS = [
-    {"id": 1, "name": "Sarah Johnson", "email": "sarah.j@acmecorp.com", "phone": "+1-555-0101", "company_id": 1, "position": "VP of Strategy", "industry": "Technology", "status": "active", "created_at": "2024-11-15T10:00:00Z"},
-    {"id": 2, "name": "Michael Chen", "email": "m.chen@globaltech.com", "phone": "+1-555-0102", "company_id": 2, "position": "CEO", "industry": "Technology", "status": "active", "created_at": "2024-11-20T14:30:00Z"},
-    {"id": 3, "name": "Emily Rodriguez", "email": "emily.r@financecorp.com", "phone": "+1-555-0103", "company_id": 3, "position": "Director of Analytics", "industry": "Finance", "status": "active", "created_at": "2024-12-01T09:15:00Z"},
-    {"id": 4, "name": "James Wilson", "email": "j.wilson@retailmax.com", "phone": "+1-555-0104", "company_id": 4, "position": "COO", "industry": "Retail", "status": "active", "created_at": "2024-12-05T11:45:00Z"},
-    {"id": 5, "name": "Lisa Thompson", "email": "lisa.t@healthfirst.com", "phone": "+1-555-0105", "company_id": 5, "position": "Chief Medical Officer", "industry": "Healthcare", "status": "active", "created_at": "2024-12-10T16:00:00Z"},
-    {"id": 6, "name": "David Park", "email": "d.park@energysolutions.com", "phone": "+1-555-0106", "company_id": 6, "position": "VP Business Development", "industry": "Energy", "status": "active", "created_at": "2024-12-15T08:30:00Z"},
-    {"id": 7, "name": "Anna Martinez", "email": "anna.m@manufacturing.com", "phone": "+1-555-0107", "company_id": 7, "position": "Supply Chain Director", "industry": "Manufacturing", "status": "active", "created_at": "2025-01-05T13:00:00Z"},
-    {"id": 8, "name": "Robert Kim", "email": "r.kim@datasystems.com", "phone": "+1-555-0108", "company_id": 8, "position": "CTO", "industry": "Technology", "status": "active", "created_at": "2025-01-10T10:45:00Z"},
-]
-
-MOCK_DEALS = [
-    {"id": 1, "name": "Enterprise AI Strategy", "value": 250000.0, "stage": "Negotiation", "company_id": 1, "contact_id": 1, "probability": 85, "expected_close_date": "2025-03-15T00:00:00Z", "created_at": "2025-01-10T09:00:00Z"},
-    {"id": 2, "name": "Market Entry Analysis - APAC", "value": 180000.0, "stage": "Proposal", "company_id": 2, "contact_id": 2, "probability": 70, "expected_close_date": "2025-04-01T00:00:00Z", "created_at": "2025-01-15T11:30:00Z"},
-    {"id": 3, "name": "Digital Transformation Roadmap", "value": 320000.0, "stage": "Discovery", "company_id": 3, "contact_id": 3, "probability": 60, "expected_close_date": "2025-05-01T00:00:00Z", "created_at": "2025-01-20T14:00:00Z"},
-    {"id": 4, "name": "Data Analytics Framework", "value": 195000.0, "stage": "Qualification", "company_id": 4, "contact_id": 4, "probability": 45, "expected_close_date": "2025-06-01T00:00:00Z", "created_at": "2025-02-01T10:00:00Z"},
-    {"id": 5, "name": "Operational Efficiency Audit", "value": 150000.0, "stage": "Closed Won", "company_id": 5, "contact_id": 5, "probability": 100, "expected_close_date": "2025-02-28T00:00:00Z", "created_at": "2024-12-20T08:30:00Z"},
-    {"id": 6, "name": "Sustainability Strategy", "value": 275000.0, "stage": "Negotiation", "company_id": 6, "contact_id": 6, "probability": 80, "expected_close_date": "2025-03-30T00:00:00Z", "created_at": "2025-01-25T16:15:00Z"},
-    {"id": 7, "name": "Supply Chain Optimization", "value": 210000.0, "stage": "Proposal", "company_id": 7, "contact_id": 7, "probability": 65, "expected_close_date": "2025-04-15T00:00:00Z", "created_at": "2025-02-05T12:00:00Z"},
-    {"id": 8, "name": "AI Implementation Program", "value": 450000.0, "stage": "Discovery", "company_id": 8, "contact_id": 8, "probability": 55, "expected_close_date": "2025-05-15T00:00:00Z", "created_at": "2025-02-10T09:45:00Z"},
-]
-
-MOCK_COMPANIES = [
-    {"id": 1, "name": "Acme Corporation", "industry": "Technology", "size": "5000+", "revenue": 5000000000.0, "location": "San Francisco, CA", "created_at": "2024-01-01T00:00:00Z"},
-    {"id": 2, "name": "GlobalTech Solutions", "industry": "Technology", "size": "1000-5000", "revenue": 1200000000.0, "location": "New York, NY", "created_at": "2024-01-05T00:00:00Z"},
-    {"id": 3, "name": "FinanceCorp International", "industry": "Finance", "size": "1000-5000", "revenue": 2500000000.0, "location": "Chicago, IL", "created_at": "2024-01-10T00:00:00Z"},
-    {"id": 4, "name": "RetailMax Group", "industry": "Retail", "size": "5000+", "revenue": 8000000000.0, "location": "Los Angeles, CA", "created_at": "2024-01-15T00:00:00Z"},
-    {"id": 5, "name": "HealthFirst Medical", "industry": "Healthcare", "size": "1000-5000", "revenue": 3500000000.0, "location": "Boston, MA", "created_at": "2024-01-20T00:00:00Z"},
-    {"id": 6, "name": "Energy Solutions Inc.", "industry": "Energy", "size": "500-1000", "revenue": 800000000.0, "location": "Houston, TX", "created_at": "2024-02-01T00:00:00Z"},
-    {"id": 7, "name": "ManufacturingCo", "industry": "Manufacturing", "size": "5000+", "revenue": 4000000000.0, "location": "Detroit, MI", "created_at": "2024-02-05T00:00:00Z"},
-    {"id": 8, "name": "DataSystems Corp", "industry": "Technology", "size": "500-1000", "revenue": 600000000.0, "location": "Seattle, WA", "created_at": "2024-02-10T00:00:00Z"},
-]
-
-MOCK_INTERACTIONS = [
-    {"id": 1, "contact_id": 1, "deal_id": 1, "type": "Meeting", "notes": "Discussed AI strategy implementation timeline and resource requirements", "outcome": "Positive - moving to next phase", "date": "2025-01-15T10:00:00Z", "created_at": "2025-01-15T10:00:00Z"},
-    {"id": 2, "contact_id": 2, "deal_id": 2, "type": "Call", "notes": "Reviewed market entry proposal for Southeast Asian markets", "outcome": "Interested - requested additional data", "date": "2025-01-20T14:30:00Z", "created_at": "2025-01-20T14:30:00Z"},
-    {"id": 3, "contact_id": 3, "deal_id": 3, "type": "Email", "notes": "Sent digital transformation case studies and ROI projections", "outcome": "Engaged - scheduling follow-up", "date": "2025-01-25T09:15:00Z", "created_at": "2025-01-25T09:15:00Z"},
-    {"id": 4, "contact_id": 4, "deal_id": 4, "type": "Meeting", "notes": "Presented data analytics framework proposal to executive team", "outcome": "Positive - legal review pending", "date": "2025-02-05T11:00:00Z", "created_at": "2025-02-05T11:00:00Z"},
-    {"id": 5, "contact_id": 5, "deal_id": 5, "type": "Call", "notes": "Finalized operational efficiency audit contract details", "outcome": "Closed - contract signed", "date": "2025-02-10T16:00:00Z", "created_at": "2025-02-10T16:00:00Z"},
-    {"id": 6, "contact_id": 6, "deal_id": 6, "type": "Meeting", "notes": "Workshop on sustainability metrics and reporting standards", "outcome": "Productive - defined scope", "date": "2025-02-15T13:30:00Z", "created_at": "2025-02-15T13:30:00Z"},
-]
-
-MOCK_REPORTS = [
-    {"id": 1, "name": "Q1 2025 Pipeline Analysis", "type": "Pipeline", "data": "{\"total_deals\": 24, "total_value\": 4500000, "win_rate\": 0.72}", "generated_for": "Executive Team", "created_at": "2024-12-01T08:00:00Z"},
-    {"id": 2, "name": "Monthly Contact Engagement", "type": "Engagement", "data": "{\"total_contacts\": 156, "active_contacts": 89, "interaction_rate\": 0.65}", "generated_for": "Sales Team", "created_at": "2025-01-01T08:00:00Z"},
-    {"id": 3, "name": "Deal Stage Distribution", "type": "Deal Health", "data": "{\"discovery\": 5, "qualification\": 4, "proposal\": 3, "negotiation\": 2, "closed_won\": 1}", "generated_for": "Management", "created_at": "2025-01-15T10:00:00Z"},
-    {"id": 4, "name": "Industry Sector Insights", "type": "Industry Analysis", "data": "{\"technology\": 0.35, "finance\": 0.20, "healthcare\": 0.15, "retail\": 0.12, "energy\": 0.10, "manufacturing\": 0.08}", "generated_for": "Strategy Team", "created_at": "2025-02-01T09:00:00Z"},
-    {"id": 5, "name": "Revenue Forecast Q2 2025", "type": "Forecast", "data": "{\"expected_revenue\": 3250000, "confidence_high\": 0.85, "confidence_low\": 0.60}", "generated_for": "Board of Directors", "created_at": "2025-02-15T14:00:00Z"},
-]
-
-# Helpers
+# --- Helper Functions ---
 def get_db():
     if SessionLocal:
         db = SessionLocal()
@@ -186,218 +545,422 @@ def get_db():
     else:
         yield None
 
-# Core Endpoints
+
+def generate_id(prefix: str) -> str:
+    return f"{prefix}_{random.randint(100, 999)}"
+
+
+# --- Health & Info Endpoints ---
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "app": "NovaMind Insights", "version": "1.0.0"}
+async def health():
+    return {"status": "ok", "app": "NovaMind AI", "version": "1.0.0"}
+
 
 @app.get("/api/info")
-def get_info():
+async def get_info():
     return {
         "name": "NovaMind Consulting",
-        "app_name": "NovaMind Insights",
-        "tagline": "Transforming data into strategy for Fortune 500 leaders",
-        "founded": "2020",
-        "team_size": 85,
-        "industry_focus": ["Technology", "Finance", "Healthcare", "Energy", "Retail", "Manufacturing"],
-        "headquarters": "New York, NY",
-        "certifications": ["ISO 27001", "GDPR Compliant", "SOC 2 Type II"]
+        "app_name": "NovaMind AI",
+        "tagline": "Transforming Fortune 500 Strategy with Artificial Intelligence",
+        "founded": "2019",
+        "team_size": 150,
+        "headquarters": "San Francisco, CA",
+        "specialties": [
+            "AI Strategy Consulting",
+            "Market Entry Analytics",
+            "Operational AI Implementation",
+            "Predictive Business Intelligence"
+        ],
+        "clients_served": 47,
+        "ai_models_deployed": 230
     }
+
 
 @app.get("/api/metrics")
-def get_metrics():
+async def get_metrics():
     return {
-        "active_deals": 18,
-        "pipeline_value": 4500000.0,
-        "won_revenue_ytd": 2150000.0,
-        "average_deal_size": 250000.0,
-        "win_rate_percent": 68,
-        "contacts_in_pipeline": 156,
-        "conversion_rate_percent": 22,
-        "interaction_rate_per_week": 37,
-        "total_revenue_target": 8000000.0,
-        "quarterly_progress_percent": 52
+        "active_projects": 42,
+        "total_revenue_ytd": 18500000.00,
+        "avg_project_value": 2100000.00,
+        "client_satisfaction_score": 4.7,
+        "ai_accuracy_rate": 0.94,
+        "project_completion_rate": 0.88,
+        "team_utilization": 0.82,
+        "new_clients_this_quarter": 8,
+        "analyses_conducted": 156,
+        "reports_generated": 89
     }
 
-# Domain-specific endpoints for CRM
 
-# Contacts
+# --- CRM Domain Endpoints ---
 @app.get("/api/contacts")
-def get_contacts():
+async def get_contacts():
     if SessionLocal:
-        db = SessionLocal()
-        contacts = db.query(Contact).all()
-        db.close()
-        return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "company_id": c.company_id, "position": c.position, "industry": c.industry, "status": c.status, "created_at": c.created_at.isoformat()} for c in contacts]
-    return MOCK_CONTACTS
+        db = next(get_db())
+        try:
+            users = db.query(UserModel).all()
+            return [
+                {
+                    "id": u.id,
+                    "name": u.name,
+                    "email": u.email,
+                    "role": u.role,
+                    "department": u.department,
+                    "created_at": u.created_at.isoformat()
+                }
+                for u in users
+            ]
+        finally:
+            db.close()
+    return MOCK_USERS
+
 
 @app.post("/api/contacts")
-def create_contact(contact: ContactCreate):
+async def create_contact(contact: UserCreate):
+    new_id = generate_id("usr")
     if SessionLocal:
-        db = SessionLocal()
-        new_contact = Contact(name=contact.name, email=contact.email, phone=contact.phone, company_id=contact.company_id, position=contact.position, industry=contact.industry, status=contact.status)
-        db.add(new_contact)
-        db.commit()
-        db.refresh(new_contact)
-        db.close()
-        return {"id": new_contact.id, "name": new_contact.name, "email": new_contact.email, "phone": new_contact.phone, "company_id": new_contact.company_id, "position": new_contact.position, "industry": new_contact.industry, "status": new_contact.status, "created_at": new_contact.created_at.isoformat()}
-    new_id = max(c["id"] for c in MOCK_CONTACTS) + 1
-    new_entry = {"id": new_id, **contact.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
-    MOCK_CONTACTS.append(new_entry)
-    return new_entry
+        db = next(get_db())
+        try:
+            new_user = UserModel(
+                id=new_id,
+                name=contact.name,
+                email=contact.email,
+                role=contact.role,
+                department=contact.department,
+                created_at=datetime.utcnow()
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            return {
+                "id": new_user.id,
+                "name": new_user.name,
+                "email": new_user.email,
+                "role": new_user.role,
+                "department": new_user.department,
+                "created_at": new_user.created_at.isoformat()
+            }
+        finally:
+            db.close()
+    else:
+        new_item = {
+            "id": new_id,
+            "name": contact.name,
+            "email": contact.email,
+            "role": contact.role,
+            "department": contact.department,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        MOCK_USERS.append(new_item)
+        return new_item
 
-# Deals
+
 @app.get("/api/deals")
-def get_deals():
+async def get_deals():
     if SessionLocal:
-        db = SessionLocal()
-        deals = db.query(Deal).all()
-        db.close()
-        return [{"id": d.id, "name": d.name, "value": d.value, "stage": d.stage, "company_id": d.company_id, "contact_id": d.contact_id, "probability": d.probability, "expected_close_date": d.expected_close_date.isoformat() if d.expected_close_date else "", "created_at": d.created_at.isoformat()} for d in deals]
-    return MOCK_DEALS
+        db = next(get_db())
+        try:
+            projects = db.query(ProjectModel).all()
+            return [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "client_id": p.client_id,
+                    "type": p.type,
+                    "status": p.status,
+                    "budget": p.budget,
+                    "start_date": p.start_date.isoformat(),
+                    "end_date": p.end_date.isoformat() if p.end_date else None,
+                    "lead_analyst_id": p.lead_analyst_id,
+                    "created_at": p.created_at.isoformat()
+                }
+                for p in projects
+            ]
+        finally:
+            db.close()
+    return MOCK_PROJECTS
+
 
 @app.post("/api/deals")
-def create_deal(deal: DealCreate):
+async def create_deal(deal: ProjectCreate):
+    new_id = generate_id("prj")
     if SessionLocal:
-        db = SessionLocal()
-        new_deal = Deal(name=deal.name, value=deal.value, stage=deal.stage, company_id=deal.company_id, contact_id=deal.contact_id, probability=deal.probability)
-        if deal.expected_close_date:
-            new_deal.expected_close_date = datetime.fromisoformat(deal.expected_close_date.replace("Z", "+00:00"))
-        db.add(new_deal)
-        db.commit()
-        db.refresh(new_deal)
-        db.close()
-        return {"id": new_deal.id, "name": new_deal.name, "value": new_deal.value, "stage": new_deal.stage, "company_id": new_deal.company_id, "contact_id": new_deal.contact_id, "probability": new_deal.probability, "expected_close_date": new_deal.expected_close_date.isoformat() if new_deal.expected_close_date else "", "created_at": new_deal.created_at.isoformat()}
-    new_id = max(d["id"] for d in MOCK_DEALS) + 1
-    new_entry = {"id": new_id, **deal.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
-    MOCK_DEALS.append(new_entry)
-    return new_entry
-
-# Pipeline
-@app.get("/api/pipeline")
-def get_pipeline():
-    stages = ["Discovery", "Qualification", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
-    pipeline_data = {}
-    for stage in stages:
-        if SessionLocal:
-            db = SessionLocal()
-            stage_deals = db.query(Deal).filter(Deal.stage == stage).all()
+        db = next(get_db())
+        try:
+            new_project = ProjectModel(
+                id=new_id,
+                name=deal.name,
+                client_id=deal.client_id,
+                type=deal.type,
+                status=deal.status,
+                budget=deal.budget,
+                start_date=datetime.fromisoformat(deal.start_date),
+                end_date=datetime.fromisoformat(deal.end_date) if deal.end_date else None,
+                lead_analyst_id=deal.lead_analyst_id,
+                created_at=datetime.utcnow()
+            )
+            db.add(new_project)
+            db.commit()
+            db.refresh(new_project)
+            return {
+                "id": new_project.id,
+                "name": new_project.name,
+                "client_id": new_project.client_id,
+                "type": new_project.type,
+                "status": new_project.status,
+                "budget": new_project.budget,
+                "start_date": new_project.start_date.isoformat(),
+                "end_date": new_project.end_date.isoformat() if new_project.end_date else None,
+                "lead_analyst_id": new_project.lead_analyst_id,
+                "created_at": new_project.created_at.isoformat()
+            }
+        finally:
             db.close()
-        else:
-            stage_deals = [d for d in MOCK_DEALS if d["stage"] == stage]
-        pipeline_data[stage] = {
-            "count": len(stage_deals),
-            "total_value": sum(d["value"] if isinstance(d, dict) else d.value for d in stage_deals)
+    else:
+        new_item = {
+            "id": new_id,
+            "name": deal.name,
+            "client_id": deal.client_id,
+            "type": deal.type,
+            "status": deal.status,
+            "budget": deal.budget,
+            "start_date": deal.start_date,
+            "end_date": deal.end_date,
+            "lead_analyst_id": deal.lead_analyst_id,
+            "created_at": datetime.utcnow().isoformat()
         }
-    return pipeline_data
+        MOCK_PROJECTS.append(new_item)
+        return new_item
 
-# Interactions
-@app.get("/api/interactions")
-def get_interactions():
+
+@app.get("/api/pipeline")
+async def get_pipeline():
+    stages = {
+        "proposal": [],
+        "planning": [],
+        "in_progress": [],
+        "completed": []
+    }
+    projects = MOCK_PROJECTS if not SessionLocal else []
     if SessionLocal:
-        db = SessionLocal()
-        interactions = db.query(Interaction).all()
-        db.close()
-        return [{"id": i.id, "contact_id": i.contact_id, "deal_id": i.deal_id, "type": i.type, "notes": i.notes, "outcome": i.outcome, "date": i.date.isoformat(), "created_at": i.created_at.isoformat()} for i in interactions]
-    return MOCK_INTERACTIONS
+        db = next(get_db())
+        try:
+            projects = db.query(ProjectModel).all()
+        finally:
+            db.close()
+    
+    for p in projects:
+        stage = p.status if p.status in stages else "planning"
+        stages[stage].append({
+            "id": p.id if isinstance(p.id, str) else p.id,
+            "name": p.name if isinstance(p.name, str) else p.name,
+            "client_id": p.client_id if isinstance(p.client_id, str) else p.client_id,
+            "type": p.type if isinstance(p.type, str) else p.type,
+            "budget": p.budget if isinstance(p.budget, (int, float)) else p.budget,
+            "start_date": (p.start_date.isoformat() if hasattr(p, 'start_date') and p.start_date else str(p.start_date)) if not isinstance(p, dict) else p.get("start_date", ""),
+            "lead": p.lead_analyst_id if isinstance(p.lead_analyst_id, str) else p.lead_analyst_id
+        })
+    
+    return {
+        "stages": stages,
+        "totals": {k: len(v) for k, v in stages.items()}
+    }
 
-@app.post("/api/interactions")
-def create_interaction(interaction: InteractionCreate):
+
+@app.get("/api/analyses")
+async def get_analyses():
     if SessionLocal:
-        db = SessionLocal()
-        new_interaction = Interaction(contact_id=interaction.contact_id, deal_id=interaction.deal_id, type=interaction.type, notes=interaction.notes, outcome=interaction.outcome)
-        db.add(new_interaction)
-        db.commit()
-        db.refresh(new_interaction)
-        db.close()
-        return {"id": new_interaction.id, "contact_id": new_interaction.contact_id, "deal_id": new_interaction.deal_id, "type": new_interaction.type, "notes": new_interaction.notes, "outcome": new_interaction.outcome, "date": new_interaction.date.isoformat(), "created_at": new_interaction.created_at.isoformat()}
-    new_id = max(i["id"] for i in MOCK_INTERACTIONS) + 1
-    new_entry = {"id": new_id, **interaction.dict(), "date": datetime.utcnow().isoformat() + "Z", "created_at": datetime.utcnow().isoformat() + "Z"}
-    MOCK_INTERACTIONS.append(new_entry)
-    return new_entry
+        db = next(get_db())
+        try:
+            analyses = db.query(AnalysisModel).all()
+            return [
+                {
+                    "id": a.id,
+                    "project_id": a.project_id,
+                    "type": a.type,
+                    "description": a.description,
+                    "status": a.status,
+                    "confidence_score": a.confidence_score,
+                    "key_findings": a.key_findings,
+                    "created_by": a.created_by,
+                    "created_at": a.created_at.isoformat()
+                }
+                for a in analyses
+            ]
+        finally:
+            db.close()
+    return MOCK_ANALYSES
 
-# Companies
-@app.get("/api/companies")
-def get_companies():
+
+@app.post("/api/analyses")
+async def create_analysis(analysis: AnalysisCreate):
+    new_id = generate_id("anl")
     if SessionLocal:
-        db = SessionLocal()
-        companies = db.query(Company).all()
-        db.close()
-        return [{"id": c.id, "name": c.name, "industry": c.industry, "size": c.size, "revenue": c.revenue, "location": c.location, "created_at": c.created_at.isoformat()} for c in companies]
-    return MOCK_COMPANIES
+        db = next(get_db())
+        try:
+            new_analysis = AnalysisModel(
+                id=new_id,
+                project_id=analysis.project_id,
+                type=analysis.type,
+                description=analysis.description,
+                status=analysis.status,
+                confidence_score=analysis.confidence_score,
+                key_findings=analysis.key_findings,
+                created_by=analysis.created_by,
+                created_at=datetime.utcnow()
+            )
+            db.add(new_analysis)
+            db.commit()
+            db.refresh(new_analysis)
+            return {
+                "id": new_analysis.id,
+                "project_id": new_analysis.project_id,
+                "type": new_analysis.type,
+                "description": new_analysis.description,
+                "status": new_analysis.status,
+                "confidence_score": new_analysis.confidence_score,
+                "key_findings": new_analysis.key_findings,
+                "created_by": new_analysis.created_by,
+                "created_at": new_analysis.created_at.isoformat()
+            }
+        finally:
+            db.close()
+    else:
+        new_item = {
+            "id": new_id,
+            "project_id": analysis.project_id,
+            "type": analysis.type,
+            "description": analysis.description,
+            "status": analysis.status,
+            "confidence_score": analysis.confidence_score,
+            "key_findings": analysis.key_findings,
+            "created_by": analysis.created_by,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        MOCK_ANALYSES.append(new_item)
+        return new_item
 
-# Reports
+
 @app.get("/api/reports")
-def get_reports():
+async def get_reports():
     if SessionLocal:
-        db = SessionLocal()
-        reports = db.query(Report).all()
-        db.close()
-        return [{"id": r.id, "name": r.name, "type": r.type, "data": r.data, "generated_for": r.generated_for, "created_at": r.created_at.isoformat()} for r in reports]
+        db = next(get_db())
+        try:
+            reports = db.query(ReportModel).all()
+            return [
+                {
+                    "id": r.id,
+                    "project_id": r.project_id,
+                    "analysis_id": r.analysis_id,
+                    "title": r.title,
+                    "status": r.status,
+                    "executive_summary": r.executive_summary,
+                    "recommendations": r.recommendations,
+                    "generated_by": r.generated_by,
+                    "generated_at": r.generated_at.isoformat()
+                }
+                for r in reports
+            ]
+        finally:
+            db.close()
     return MOCK_REPORTS
 
-@app.post("/api/reports")
-def create_report(report: ReportCreate):
-    if SessionLocal:
-        db = SessionLocal()
-        new_report = Report(name=report.name, type=report.type, data=report.data, generated_for=report.generated_for)
-        db.add(new_report)
-        db.commit()
-        db.refresh(new_report)
-        db.close()
-        return {"id": new_report.id, "name": new_report.name, "type": new_report.type, "data": new_report.data, "generated_for": new_report.generated_for, "created_at": new_report.created_at.isoformat()}
-    new_id = max(r["id"] for r in MOCK_REPORTS) + 1
-    new_entry = {"id": new_id, **report.dict(), "created_at": datetime.utcnow().isoformat() + "Z"}
-    MOCK_REPORTS.append(new_entry)
-    return new_entry
 
-# Additional CRM analytics endpoints
+@app.post("/api/reports")
+async def create_report(report: ReportCreate):
+    new_id = generate_id("rpt")
+    if SessionLocal:
+        db = next(get_db())
+        try:
+            new_report = ReportModel(
+                id=new_id,
+                project_id=report.project_id,
+                analysis_id=report.analysis_id,
+                title=report.title,
+                status=report.status,
+                executive_summary=report.executive_summary,
+                recommendations=report.recommendations,
+                generated_by=report.generated_by,
+                generated_at=datetime.utcnow()
+            )
+            db.add(new_report)
+            db.commit()
+            db.refresh(new_report)
+            return {
+                "id": new_report.id,
+                "project_id": new_report.project_id,
+                "analysis_id": new_report.analysis_id,
+                "title": new_report.title,
+                "status": new_report.status,
+                "executive_summary": new_report.executive_summary,
+                "recommendations": new_report.recommendations,
+                "generated_by": new_report.generated_by,
+                "generated_at": new_report.generated_at.isoformat()
+            }
+        finally:
+            db.close()
+    else:
+        new_item = {
+            "id": new_id,
+            "project_id": report.project_id,
+            "analysis_id": report.analysis_id,
+            "title": report.title,
+            "status": report.status,
+            "executive_summary": report.executive_summary,
+            "recommendations": report.recommendations,
+            "generated_by": report.generated_by,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        MOCK_REPORTS.append(new_item)
+        return new_item
+
+
 @app.get("/api/stats")
-def get_stats():
+async def get_stats():
+    total_projects = len(MOCK_PROJECTS) if not SessionLocal else 42
+    total_analyses = len(MOCK_ANALYSES) if not SessionLocal else 156
+    total_reports = len(MOCK_REPORTS) if not SessionLocal else 89
+    
     return {
-        "total_contacts": 156,
-        "active_contacts": 89,
-        "total_deals": 24,
-        "deals_won_this_month": 3,
-        "deals_lost_this_month": 1,
-        "average_cycle_days": 45,
-        "total_companies": 48,
-        "interactions_this_week": 37,
-        "pipeline_value": 4500000.0,
-        "forecasted_revenue": 3250000.0
+        "total_contacts": len(MOCK_USERS) if not SessionLocal else 34,
+        "total_clients": len(MOCK_CLIENTS) if not SessionLocal else 47,
+        "active_projects": total_projects,
+        "total_analyses": total_analyses,
+        "total_reports": total_reports,
+        "avg_confidence_score": 0.89,
+        "projects_by_status": {
+            "proposal": 5,
+            "planning": 12,
+            "in_progress": 18,
+            "completed": 7
+        },
+        "monthly_growth": 0.15
     }
+
 
 @app.get("/api/recent-activity")
-def get_recent_activity():
-    return [
-        {"id": 1, "type": "deal_closed", "description": "Deal 'Operational Efficiency Audit' closed with HealthFirst Medical", "value": 150000.0, "timestamp": "2025-02-28T16:30:00Z", "user": "AI Assistant"},
-        {"id": 2, "type": "meeting", "description": "Strategy meeting with GlobalTech Solutions CEO", "timestamp": "2025-02-27T10:00:00Z", "user": "John Smith"},
-        {"id": 3, "type": "contact_added", "description": "New contact added: Robert Kim from DataSystems Corp", "timestamp": "2025-02-25T14:15:00Z", "user": "Sarah Chen"},
-        {"id": 4, "type": "proposal_sent", "description": "Enterprise AI Strategy proposal sent to Acme Corporation", "value": 250000.0, "timestamp": "2025-02-24T09:45:00Z", "user": "AI Assistant"},
-        {"id": 5, "type": "report_generated", "description": "AI-powered revenue forecast report generated for Board of Directors", "timestamp": "2025-02-23T11:00:00Z", "user": "System"}
-    ]
-
-@app.get("/api/chart-data")
-def get_chart_data():
-    return {
-        "pipeline_by_stage": {
-            "labels": ["Discovery", "Qualification", "Proposal", "Negotiation", "Closed Won"],
-            "values": [450000, 520000, 680000, 850000, 2150000],
-            "counts": [5, 4, 3, 2, 1]
+async def get_recent_activity():
+    activities = [
+        {
+            "id": "act_001",
+            "type": "report_generated",
+            "description": "APAC Customer Segmentation Analysis completed",
+            "user": "Emily Nakamura",
+            "timestamp": "2024-04-22T10:00:00"
         },
-        "monthly_revenue": {
-            "labels": ["Oct", "Nov", "Dec", "Jan", "Feb"],
-            "values": [150000, 180000, 220000, 310000, 420000]
+        {
+            "id": "act_002",
+            "type": "analysis_updated",
+            "description": "Predictive Maintenance model confidence improved to 87%",
+            "user": "Dr. Robert Kim",
+            "timestamp": "2024-04-21T15:30:00"
         },
-        "industry_distribution": {
-            "labels": ["Technology", "Finance", "Healthcare", "Retail", "Energy", "Manufacturing"],
-            "values": [35, 20, 15, 12, 10, 8]
+        {
+            "id": "act_003",
+            "type": "client_onboarded",
+            "description": "MediTech Innovations onboarded as new client",
+            "user": "Olivia Patel",
+            "timestamp": "2024-04-20T09:15:00"
         },
-        "engagement_trend": {
-            "labels": ["Week 1", "Week 2", "Week 3", "Week 4"],
-            "values": [28, 32, 35, 37]
-        }
-    }
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+        {
+            "id": "act
