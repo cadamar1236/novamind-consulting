@@ -1,641 +1,75 @@
-```jsx
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {
-  SearchPanel,
-  PlusPanel,
-  UsersPanel,
-  DollarSign,
-  TargetPanel,
-  ActivityPanel,
-  FileTextPanel,
-  FilterPanel,
-  SortAsc,
-  SortDesc,
-  DownloadPanel,
-  CheckCirclePanel,
-  PhonePanel,
-  MailPanel,
-  CalendarPanel,
-  MessageSquarePanel,
-  ChevronRightPanel,
-  ClockPanel,
-  Building2,
-  TrendingUpPanel,
-  BarChart3Panel,
-  XPanel,
-} from 'lucide-react';
+const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'Lead' })
+  const [errors, setErrors] = useState({})
+  const [toast, setToast] = useState(null)
 
-const BASE = window.__BACKEND_URL__ || '';
-async function apiFetch(path, opts = {}) {
-  for (let i = 0; i < 5; i++) {
-    try {
-      const r = await fetch(BASE + path, opts);
-      if (r.ok) return r.json();
-    } catch (_) {}
-    await new Promise(r => setTimeout(r, 1500));
+  const validate = () => {
+    const errs = {}
+    if (!form.name.trim()) errs.name = 'Deal name is required'
+    if (!form.company.trim()) errs.company = 'Company is required'
+    if (!form.value || isNaN(form.value) || Number(form.value) <= 0) errs.value = 'Enter a valid amount'
+    return errs
   }
-  return null;
-}
-
-const MOCK_CONTACTS = [
-  { id: 1, name: 'Sarah Chen', company: 'TechGlobal Inc', status: 'Active', lastContact: '2024-01-15', email: 'sarah@techglobal.com', phone: '+1-555-0123', owner: 'Alex M' },
-  { id: 2, name: 'Marcus Johnson', company: 'Apex Ventures', status: 'Lead', lastContact: '2024-01-12', email: 'marcus@apex.com', phone: '+1-555-0124', owner: 'Julia R' },
-  { id: 3, name: 'Emily Rodriguez', company: 'Summit Corp', status: 'Active', lastContact: '2024-01-10', email: 'emily@summitcorp.com', phone: '+1-555-0125', owner: 'Alex M' },
-  { id: 4, name: 'David Kim', company: 'Horizon Group', status: 'Inactive', lastContact: '2023-12-20', email: 'david@horizon.com', phone: '+1-555-0126', owner: 'Tom W' },
-  { id: 5, name: 'Lisa Thompson', company: 'NexGen Solutions', status: 'Active', lastContact: '2024-01-14', email: 'lisa@nexgen.com', phone: '+1-555-0127', owner: 'Julia R' },
-];
-
-const MOCK_DEALS = [
-  { id: 1, name: 'Enterprise SaaS Platform', company: 'TechGlobal Inc', value: 450000, stage: 'Won', owner: 'Alex M', probability: 100, nextAction: 'Contract signing' },
-  { id: 2, name: 'AI Consulting Package', company: 'Apex Ventures', value: 280000, stage: 'Proposal', owner: 'Julia R', probability: 75, nextAction: 'Send proposal' },
-  { id: 3, name: 'Market Entry Strategy', company: 'Summit Corp', value: 320000, stage: 'Qualified', owner: 'Alex M', probability: 50, nextAction: 'Discovery call' },
-  { id: 4, name: 'Data Analytics Suite', company: 'Horizon Group', value: 180000, stage: 'Lead', owner: 'Tom W', probability: 25, nextAction: 'Initial outreach' },
-  { id: 5, name: 'Digital Transformation', company: 'NexGen Solutions', value: 550000, stage: 'Proposal', owner: 'Julia R', probability: 80, nextAction: 'Negotiation' },
-  { id: 6, name: 'Cloud Migration', company: 'TechGlobal Inc', value: 380000, stage: 'Qualified', owner: 'Alex M', probability: 60, nextAction: 'Technical demo' },
-  { id: 7, name: 'AI Automation', company: 'Apex Ventures', value: 220000, stage: 'Lead', owner: 'Julia R', probability: 30, nextAction: 'Follow-up email' },
-];
-
-const MOCK_ACTIVITIES = [
-  { id: 1, type: 'call', description: 'Discovery call with Sarah Chen', date: '2024-01-15 14:30', duration: '45 min', contact: 'Sarah Chen' },
-  { id: 2, type: 'email', description: 'Sent proposal to Marcus Johnson', date: '2024-01-14 11:00', contact: 'Marcus Johnson' },
-  { id: 3, type: 'meeting', description: 'Strategy workshop with TechGlobal', date: '2024-01-13 10:00', duration: '2 hours', contact: 'Sarah Chen' },
-  { id: 4, type: 'call', description: 'Follow-up with Emily Rodriguez', date: '2024-01-12 15:00', duration: '30 min', contact: 'Emily Rodriguez' },
-  { id: 5, type: 'email', description: 'Contract sent to Lisa Thompson', date: '2024-01-11 09:30', contact: 'Lisa Thompson' },
-];
-
-const PIPELINE_COLUMNS = ['Lead', 'Qualified', 'Proposal', 'Won'];
-
-function useCSS() {
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      :root { --accent: #00B4D8; --accent2: #1A3A5C; }
-      .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
-      .gradient-text { background: linear-gradient(135deg, #00B4D8, #1A3A5C, #6366F1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-      .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-      @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
-      @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
-      .fade-in { animation: fadeIn 0.3s ease forwards; }
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
-      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-      .kanban-card { transition: transform 0.2s, box-shadow 0.2s; }
-      .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,180,216,0.1); }
-      .modal-overlay { background: rgba(6,8,15,0.8); backdrop-filter: blur(8px); }
-    `;
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, []);
-}
-
-function Sidebar({ activeTab, setActiveTab, setShowNewContact, setShowNewDeal }) {
-  const navItems = [
-    { id: 'contacts', label: 'Contacts', icon: UsersPanel },
-    { id: 'deals', label: 'Deals', icon: DollarSign },
-    { id: 'pipeline', label: 'Pipeline', icon: TargetPanel },
-    { id: 'activities', label: 'Activities', icon: ActivityPanel },
-    { id: 'reports', label: 'Reports', icon: BarChart3Panel },
-  ];
-
-  return (
-    <aside className="w-64 flex-shrink-0 flex flex-col border-r border-white/5 bg-white/[0.02] h-full">
-      <div className="p-6 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center">
-            <TargetPanel size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold gradient-text">NovaMind Insights</h1>
-            <p className="text-xs text-slate-400 mt-0.5">AI-Powered CRM</p>
-          </div>
-        </div>
-      </div>
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-              activeTab === item.id
-                ? 'bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <item.icon size={18} />
-            <span className="text-sm font-medium">{item.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-white/5 space-y-2">
-        <button
-          onClick={() => setShowNewContact(true)}
-          className="w-full flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium transition-all duration-200 hover:shadow-lg"
-        >
-          <PlusPanel size={16} /> New Contact
-        </button>
-        <button
-          onClick={() => setShowNewDeal(true)}
-          className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all duration-200"
-        >
-          <PlusPanel size={16} /> New Deal
-        </button>
-      </div>
-    </aside>
-  );
-}
-
-function TopBar({ title }) {
-  return (
-    <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <SearchPanel size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            placeholder="SearchPanel anything..."
-            className="w-64 pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all duration-200"
-          />
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function KPICard({ icon: Icon, label, value, delta, trend }) {
-  return (
-    <div className="glass p-5 fade-in">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-10 h-10 rounded-lg bg-[#00B4D8]/10 flex items-center justify-center">
-          <Icon size={20} className="text-[#00B4D8]" />
-        </div>
-        {delta && (
-          <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
-            trend === 'up' ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'
-          }`}>
-            {trend === 'up' ? <TrendingUpPanel size={12} /> : <TrendingUpPanel size={12} className="rotate-180" />}
-            {delta}
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-    </div>
-  );
-}
-
-function ContactsTable({ contacts, searchTerm, onSort, sortConfig }) {
-  const filtered = useMemo(() => {
-    if (!searchTerm) return contacts;
-    return contacts.filter(c =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.company.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [contacts, searchTerm]);
-
-  const sorted = useMemo(() => {
-    if (!sortConfig.key) return filtered;
-    return [...filtered].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filtered, sortConfig]);
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Active': return 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20';
-      case 'Lead': return 'bg-amber-400/10 text-amber-400 border-amber-400/20';
-      case 'Inactive': return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
-      default: return 'bg-slate-400/10 text-slate-400 border-slate-400/20';
-    }
-  };
-
-  return (
-    <div className="glass overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/5">
-              {['name', 'company', 'status', 'lastContact', 'owner'].map(col => (
-                <th
-                  key={col}
-                  onClick={() => onSort(col)}
-                  className="text-left px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-1">
-                    {col === 'name' ? 'Name' : col === 'company' ? 'Company' : col === 'status' ? 'Status' : col === 'lastContact' ? 'Last Contact' : 'Owner'}
-                    {sortConfig.key === col && (
-                      sortConfig.direction === 'asc' ? <SortAsc size={12} /> : <SortDesc size={12} />
-                    )}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(sorted || []).map((contact, idx) => (
-              <tr
-                key={contact.id}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer fade-in"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00B4D8] to-[#1A3A5C] flex items-center justify-center text-xs font-medium">
-                      {contact.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">{contact.name}</p>
-                      <p className="text-xs text-slate-400">{contact.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Building2 size={14} className="text-slate-500" />
-                    <span className="text-sm text-slate-300">{contact.company}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2.5 py-1 rounded-full border ${getStatusColor(contact.status)}`}>
-                    {contact.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-400">{contact.lastContact}</td>
-                <td className="px-4 py-3 text-sm text-slate-400">{contact.owner}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function KanbanBoard({ deals, onSelectDeal }) {
-  return (
-    <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '400px' }}>
-      {PIPELINE_COLUMNS.map((column, colIdx) => {
-        const columnDeals = (deals || []).filter(d => d.stage === column);
-        return (
-          <div key={column} className="flex-1 min-w-[280px]">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  column === 'Lead' ? 'bg-slate-400' :
-                  column === 'Qualified' ? 'bg-amber-400' :
-                  column === 'Proposal' ? 'bg-blue-400' : 'bg-emerald-400'
-                }`} />
-                <span className="text-sm font-medium text-slate-300">{column}</span>
-                <span className="text-xs text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">{columnDeals.length}</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {(columnDeals || []).map((deal, cardIdx) => (
-                <div
-                  key={deal.id}
-                  onClick={() => onSelectDeal(deal)}
-                  className="glass p-4 cursor-pointer kanban-card fade-in"
-                  style={{ animationDelay: `${cardIdx * 100}ms` }}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="text-sm font-medium text-white">{deal.name}</h4>
-                    <span className="text-xs text-slate-400">{deal.company}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
-                    <div className="flex items-center gap-1">
-                      <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
-                          style={{ width: `${deal.probability}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-slate-500">{deal.probability}%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
-                    <span className="text-xs text-slate-500">{deal.owner}</span>
-                    <span className="text-xs text-slate-500">•</span>
-                    <span className="text-xs text-slate-500">{deal.nextAction}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ActivityFeed({ activities }) {
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'call': return { icon: PhonePanel, color: 'text-emerald-400 bg-emerald-400/10' };
-      case 'email': return { icon: MailPanel, color: 'text-blue-400 bg-blue-400/10' };
-      case 'meeting': return { icon: CalendarPanel, color: 'text-amber-400 bg-amber-400/10' };
-      default: return { icon: MessageSquarePanel, color: 'text-slate-400 bg-slate-400/10' };
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {(activities || []).map((activity, idx) => {
-        const { icon: Icon, color } = getActivityIcon(activity.type);
-        return (
-          <div key={activity.id} className="flex gap-4 fade-in" style={{ animationDelay: `${idx * 100}ms` }}>
-            <div className="flex flex-col items-center">
-              <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center`}>
-                <Icon size={16} />
-              </div>
-              {idx < activities.length - 1 && <div className="w-px flex-1 bg-white/5 my-2" />}
-            </div>
-            <div className="flex-1 pb-6">
-              <div className="glass p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">{activity.description}</span>
-                  <span className="text-xs text-slate-500">{activity.date}</span>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <UsersPanel size={12} />
-                    {activity.contact}
-                  </span>
-                  {activity.duration && (
-                    <span className="flex items-center gap-1">
-                      <ClockPanel size={12} />
-                      {activity.duration}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function DealModal({ deal, onClose }) {
-  if (!deal) return null;
-
-  const stageColors = {
-    Lead: 'from-slate-400 to-slate-500',
-    Qualified: 'from-amber-400 to-amber-500',
-    Proposal: 'from-blue-400 to-blue-500',
-    Won: 'from-emerald-400 to-emerald-500',
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
-      <div className="glass p-6 w-full max-w-lg mx-4 fade-in" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white">{deal.name}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
-            <XPanel size={18} className="text-slate-400" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400">Value</span>
-            <span className="text-lg font-bold text-[#00B4D8]">${(deal.value / 1000).toFixed(0)}k</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400">Stage</span>
-            <span className={`text-sm font-medium px-3 py-1 rounded-full bg-gradient-to-r ${stageColors[deal.stage]} text-white`}>
-              {deal.stage}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400">Owner</span>
-            <span className="text-sm text-white">{deal.owner}</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400">Probability</span>
-            <div className="flex items-center gap-2">
-              <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#00B4D8] to-emerald-400 rounded-full"
-                  style={{ width: `${deal.probability}%` }}
-                />
-              </div>
-              <span className="text-sm text-white">{deal.probability}%</span>
-            </div>
-          </div>
-          <div className="p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400 block mb-1">Next Action</span>
-            <span className="text-sm text-white flex items-center gap-2">
-              <ChevronRightPanel size={14} className="text-[#00B4D8]" />
-              {deal.nextAction}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-            <span className="text-sm text-slate-400">Company</span>
-            <span className="text-sm text-white">{deal.company}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NewContactForm({ onClose, onSubmit }) {
-  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', status: 'Lead' });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const newErrors = {};
-    if (!form.name.trim()) newErrors.name = 'Name is required';
-    if (!form.company.trim()) newErrors.company = 'Company is required';
-    if (!form.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email format';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validate()) {
-      onSubmit({ ...form, id: Date.now(), lastContact: new Date().toISOString().split('T')[0], owner: 'Current User' });
-      onClose();
+    e.preventDefault()
+    const errs = validate()
+    setErrors(errs)
+    if (Object.keys(errs).length === 0) {
+      setToast({ type: 'success', message: 'Deal created successfully!' })
+      setTimeout(() => { setToast(null); onClose() }, 1500)
     }
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
-      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="glass p-6 max-w-md w-full fade-in" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <UsersPanel size={20} className="text-[#00B4D8]" />
-            New Contact
-          </h3>
+          <h2 className="text-lg font-semibold text-slate-200">New Deal</h2>
           <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
-            <XPanel size={18} className="text-slate-400" />
+            <X size={20} className="text-slate-400" />
           </button>
         </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Name</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Deal Name</label>
             <input
               type="text"
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
-              placeholder="Full name"
-            />
-            {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Company</label>
-            <input
-              type="text"
-              value={form.company}
-              onChange={e => setForm({ ...form, company: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
-              placeholder="Company name"
-            />
-            {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.email ? 'border-red-400/50' : 'border-white/10'}`}
-              placeholder="email@company.com"
-            />
-            {errors.email && <p className="text-xs text-red-400 mt-1">{errors.email}</p>}
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">PhonePanel</label>
-            <input
-              type="text"
-              value={form.phone}
-              onChange={e => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all"
-              placeholder="+1-555-0123"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Status</label>
-            <select
-              value={form.status}
-              onChange={e => setForm({ ...form, status: e.target.value })}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
-            >
-              <option value="Lead">Lead</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm font-medium hover:bg-white/10 transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1A3A5C] text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
-            >
-              Create Contact
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function NewDealForm({ onClose, onSubmit }) {
-  const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'Lead' });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const newErrors = {};
-    if (!form.name.trim()) newErrors.name = 'Deal name is required';
-    if (!form.company.trim()) newErrors.company = 'Company is required';
-    if (!form.value || form.value <= 0) newErrors.value = 'Value must be a positive number';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validate()) {
-      onSubmit({
-        ...form,
-        id: Date.now(),
-        value: Number(form.value),
-        owner: 'Current User',
-        probability: form.stage === 'Lead' ? 25 : form.stage === 'Qualified' ? 50 : form.stage === 'Proposal' ? 75 : 100,
-        nextAction: 'Pending review',
-      });
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 modal-overlay flex items-center justify-center" onClick={onClose}>
-      <div className="glass p-6 w-full max-w-md mx-4 fade-in" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <DollarSign size={20} className="text-[#00B4D8]" />
-            New Deal
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg transition-colors">
-            <XPanel size={18} className="text-slate-400" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Deal Name</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.name ? 'border-red-400/50' : 'border-white/10'}`}
+              className={`w-full bg-white/5 border rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-colors ${errors.name ? 'border-red-500' : 'border-white/10'}`}
               placeholder="Enter deal name"
             />
             {errors.name && <p className="text-xs text-red-400 mt-1">{errors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Company</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Company</label>
             <input
               type="text"
               value={form.company}
               onChange={e => setForm({ ...form, company: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.company ? 'border-red-400/50' : 'border-white/10'}`}
-              placeholder="Company name"
+              className={`w-full bg-white/5 border rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-colors ${errors.company ? 'border-red-500' : 'border-white/10'}`}
+              placeholder="Enter company name"
             />
             {errors.company && <p className="text-xs text-red-400 mt-1">{errors.company}</p>}
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Value ($)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Value ($)</label>
             <input
               type="number"
               value={form.value}
               onChange={e => setForm({ ...form, value: e.target.value })}
-              className={`w-full px-3 py-2 bg-white/5 border rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-all ${errors.value ? 'border-red-400/50' : 'border-white/10'}`}
-              placeholder="Deal value"
-              min="0"
+              className={`w-full bg-white/5 border rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]/50 transition-colors ${errors.value ? 'border-red-500' : 'border-white/10'}`}
+              placeholder="Enter deal value"
             />
             {errors.value && <p className="text-xs text-red-400 mt-1">{errors.value}</p>}
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Stage</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Stage</label>
             <select
               value={form.stage}
               onChange={e => setForm({ ...form, stage: e.target.value })}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#00B4D8]/50 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#00B4D8]/50 transition-colors"
             >
               <option value="Lead">Lead</option>
               <option value="Qualified">Qualified</option>
@@ -643,4 +77,410 @@ function NewDealForm({ onClose, onSubmit }) {
               <option value="Won">Won</option>
             </select>
           </div>
-          <div
+          <button
+            type="submit"
+            className="w-full px-4 py-2.5 bg-gradient-to-r from-[#00B4D8] to-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            Create Deal
+          </button>
+        </form>
+
+        {toast && (
+          <div className={`fixed bottom-6 right-6 glass px-4 py-3 flex items-center gap-2 fade-in ${
+            toast.type === 'success' ? 'text-emerald-400' : 'text-red-400'
+          }`}>
+            <CheckCircle size={18} />
+            <span className="text-sm">{toast.message}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Dashboard() {
+  const [timeRange, setTimeRange] = useState('week')
+  const revenueData = [
+    { label: 'Mon', value: 45000 },
+    { label: 'Tue', value: 52000 },
+    { label: 'Wed', value: 38000 },
+    { label: 'Thu', value: 61000 },
+    { label: 'Fri', value: 48000 },
+    { label: 'Sat', value: 29000 },
+    { label: 'Sun', value: 35000 }
+  ]
+
+  const dealData = [
+    { label: 'Lead', value: 12 },
+    { label: 'Qualified', value: 8 },
+    { label: 'Proposal', value: 5 },
+    { label: 'Won', value: 3 }
+  ]
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Dashboard Overview</h2>
+        <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+          {['week', 'month', 'year'].map(range => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+                timeRange === range ? 'bg-[#00B4D8]/20 text-[#00B4D8]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {range.charAt(0).toUpperCase() + range.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard icon={DollarSign} label="Total Revenue" value="$308K" delta={12.5} gradient="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20" />
+        <KPICard icon={Users} label="Active Contacts" value="156" delta={8.2} gradient="bg-gradient-to-br from-blue-500/20 to-blue-600/20" />
+        <KPICard icon={TrendingUp} label="Deals Won" value="23" delta={3.1} gradient="bg-gradient-to-br from-purple-500/20 to-purple-600/20" />
+        <KPICard icon={Activity} label="Win Rate" value="68%" delta={5.7} gradient="bg-gradient-to-br from-amber-500/20 to-amber-600/20" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4">Revenue Trend</h3>
+          <LineChart data={revenueData} height={200} />
+        </div>
+        <div className="glass p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4">Deal Pipeline</h3>
+          <BarChart data={dealData} height={200} />
+        </div>
+      </div>
+
+      <div className="glass p-5">
+        <h3 className="text-sm font-semibold text-slate-300 mb-4">Recent Activity</h3>
+        <ActivityFeed activities={MOCK_ACTIVITIES} />
+      </div>
+    </div>
+  )
+}
+
+function Contacts() {
+  const [contacts, setContacts] = useState(MOCK_CONTACTS)
+  const [showNewContact, setShowNewContact] = useState(false)
+
+  const columns = [
+    { key: 'name', label: 'Name', render: (row) => (
+      <span className="font-medium text-slate-200">{row.name}</span>
+    )},
+    { key: 'company', label: 'Company' },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'status', label: 'Status', render: (row) => (
+      <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
+        row.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
+        row.status === 'New' ? 'bg-blue-500/10 text-blue-400' :
+        'bg-slate-500/10 text-slate-400'
+      }`}>
+        {row.status}
+      </span>
+    )},
+    { key: 'deals', label: 'Deals' },
+    { key: 'revenue', label: 'Revenue', render: (row) => `$${row.revenue.toLocaleString()}` }
+  ]
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Contacts</h2>
+        <button
+          onClick={() => setShowNewContact(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00B4D8] to-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          <UserPlus size={16} />
+          Add Contact
+        </button>
+      </div>
+
+      <DataTable columns={columns} data={contacts} />
+
+      {showNewContact && <NewContactModal onClose={() => setShowNewContact(false)} />}
+    </div>
+  )
+}
+
+function Deals() {
+  const [deals, setDeals] = useState(MOCK_DEALS)
+  const [selectedDeal, setSelectedDeal] = useState(null)
+  const [showNewDeal, setShowNewDeal] = useState(false)
+
+  const totalPipeline = deals.reduce((sum, d) => sum + d.value, 0)
+  const wonDeals = deals.filter(d => d.stage === 'Won')
+  const wonRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0)
+
+  const columns = [
+    { key: 'name', label: 'Deal Name', render: (row) => (
+      <span className="font-medium text-slate-200">{row.name}</span>
+    )},
+    { key: 'company', label: 'Company' },
+    { key: 'value', label: 'Value', render: (row) => `$${row.value.toLocaleString()}` },
+    { key: 'stage', label: 'Stage', render: (row) => (
+      <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
+        row.stage === 'Won' ? 'bg-emerald-500/10 text-emerald-400' :
+        row.stage === 'Proposal' ? 'bg-blue-500/10 text-blue-400' :
+        row.stage === 'Qualified' ? 'bg-amber-500/10 text-amber-400' :
+        'bg-slate-500/10 text-slate-400'
+      }`}>
+        {row.stage}
+      </span>
+    )},
+    { key: 'owner', label: 'Owner' },
+    { key: 'probability', label: 'Probability', render: (row) => `${row.probability}%` }
+  ]
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Deals</h2>
+        <button
+          onClick={() => setShowNewDeal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00B4D8] to-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          <Plus size={16} />
+          New Deal
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Pipeline Value</div>
+          <div className="text-xl font-bold text-slate-200">${totalPipeline.toLocaleString()}</div>
+        </div>
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Deals Won</div>
+          <div className="text-xl font-bold text-emerald-400">{wonDeals.length}</div>
+        </div>
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Revenue from Won</div>
+          <div className="text-xl font-bold text-slate-200">${wonRevenue.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <DataTable columns={columns} data={deals} onRowClick={setSelectedDeal} />
+
+      {selectedDeal && <DealModal deal={selectedDeal} onClose={() => setSelectedDeal(null)} />}
+      {showNewDeal && <NewDealModal onClose={() => setShowNewDeal(false)} />}
+    </div>
+  )
+}
+
+function Pipeline() {
+  const [deals, setDeals] = useState(MOCK_DEALS)
+  const [selectedDeal, setSelectedDeal] = useState(null)
+
+  return (
+    <div className="space-y-6 p-6 h-full">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Pipeline</h2>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-lg transition-colors">
+            <SortAsc size={16} />
+            Sort
+          </button>
+        </div>
+      </div>
+
+      <div className="h-[calc(100vh-12rem)]">
+        <KanbanBoard deals={deals} onDealClick={setSelectedDeal} />
+      </div>
+
+      {selectedDeal && <DealModal deal={selectedDeal} onClose={() => setSelectedDeal(null)} />}
+    </div>
+  )
+}
+
+function Activities() {
+  const [activities, setActivities] = useState(MOCK_ACTIVITIES)
+  const [filter, setFilter] = useState('all')
+
+  const filtered = filter === 'all' ? activities : activities.filter(a => a.type === filter)
+
+  const stats = {
+    total: activities.length,
+    calls: activities.filter(a => a.type === 'call').length,
+    emails: activities.filter(a => a.type === 'email').length,
+    meetings: activities.filter(a => a.type === 'meeting').length
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Activities</h2>
+        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00B4D8] to-[#1E3A5F] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+          <Plus size={16} />
+          Log Activity
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Total Activities</div>
+          <div className="text-xl font-bold text-slate-200">{stats.total}</div>
+        </div>
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Calls</div>
+          <div className="text-xl font-bold text-emerald-400">{stats.calls}</div>
+        </div>
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Emails</div>
+          <div className="text-xl font-bold text-blue-400">{stats.emails}</div>
+        </div>
+        <div className="glass p-4">
+          <div className="text-xs text-slate-500 mb-1">Meetings</div>
+          <div className="text-xl font-bold text-purple-400">{stats.meetings}</div>
+        </div>
+      </div>
+
+      <div className="flex gap-1 bg-white/5 rounded-lg p-0.5 w-fit">
+        {['all', 'call', 'email', 'meeting'].map(type => (
+          <button
+            key={type}
+            onClick={() => setFilter(type)}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all capitalize ${
+              filter === type ? 'bg-[#00B4D8]/20 text-[#00B4D8]' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
+
+      <ActivityFeed activities={filtered} />
+    </div>
+  )
+}
+
+function Reports() {
+  const revenueData = [
+    { label: 'Jan', value: 45000 },
+    { label: 'Feb', value: 52000 },
+    { label: 'Mar', value: 38000 },
+    { label: 'Apr', value: 61000 },
+    { label: 'May', value: 48000 },
+    { label: 'Jun', value: 72000 }
+  ]
+
+  const dealStageData = [
+    { label: 'Lead', value: 45 },
+    { label: 'Qualified', value: 32 },
+    { label: 'Proposal', value: 18 },
+    { label: 'Won', value: 12 }
+  ]
+
+  const metrics = [
+    { label: 'Conversion Rate', value: '68%', delta: 5.2 },
+    { label: 'Avg Deal Size', value: '$182K', delta: 12.8 },
+    { label: 'Sales Cycle', value: '45 days', delta: -8.3 },
+    { label: 'Customer Satisfaction', value: '4.8/5', delta: 3.1 }
+  ]
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-slate-200">Reports & Analytics</h2>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 hover:bg-white/5 rounded-lg transition-colors">
+            <Download size={16} />
+            Export
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map((metric, i) => (
+          <div key={i} className="glass p-5 fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-sm text-slate-400">{metric.label}</div>
+              {metric.delta !== undefined && (
+                <span className={`flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+                  metric.delta >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                }`}>
+                  {metric.delta >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                  {Math.abs(metric.delta)}%
+                </span>
+              )}
+            </div>
+            <div className="text-2xl font-bold text-slate-200">{metric.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4">Revenue (6 Months)</h3>
+          <LineChart data={revenueData} height={250} />
+        </div>
+        <div className="glass p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4">Deal Stage Distribution</h3>
+          <BarChart data={dealStageData} height={250} />
+        </div>
+      </div>
+
+      <div className="glass p-5">
+        <h3 className="text-sm font-semibold text-slate-300 mb-4">Performance Insights</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="glass p-4 hover-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Target size={16} className="text-[#00B4D8]" />
+              <span className="text-sm font-medium text-slate-300">Top Performer</span>
+            </div>
+            <div className="text-sm text-slate-400">Sarah K. closed $450K this quarter</div>
+          </div>
+          <div className="glass p-4 hover-card">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={16} className="text-emerald-400" />
+              <span className="text-sm font-medium text-slate-300">Growth Area</span>
+            </div>
+            <div className="text-sm text-slate-400">Enterprise deals up 23% this month</div>
+          </div>
+          <div className="glass p-4 hover-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Star size={16} className="text-amber-400" />
+              <span className="text-sm font-medium text-slate-300">Opportunity</span>
+            </div>
+            <div className="text-sm text-slate-400">5 leads approaching decision stage</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function App() {
+  const [activePage, setActivePage] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const pages = {
+    dashboard: Dashboard,
+    contacts: Contacts,
+    deals: Deals,
+    pipeline: Pipeline,
+    activities: Activities,
+    reports: Reports
+  }
+
+  const Page = pages[activePage] || Dashboard
+
+  return (
+    <div className="flex h-screen bg-[#06080f] text-slate-200">
+      <CssInjection />
+      <Sidebar activePage={activePage} setActivePage={setActivePage} isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar activePage={activePage} setIsOpen={setSidebarOpen} />
+        <main className="flex-1 overflow-y-auto">
+          <Page />
+        </main>
+      </div>
+      <div id="portal-root" />
+    </div>
+  )
+}
+
+export default App
