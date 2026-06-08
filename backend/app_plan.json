@@ -1,28 +1,43 @@
 {
-  "app_type": "crm",
-  "app_name": "NovaMind AI",
-  "tagline": "Data-driven strategy insights for Fortune 500 market leadership.",
-  "primary_color": "#1E3A5F",
-  "accent_color": "#00B4D8",
+  "app_type": "saas_dashboard",
+  "app_name": "NovaMind",
+  "tagline": "AI-powered strategy that cuts market entry analysis time by 50% for Fortune 500 companies",
+  "primary_color": "#1a3a5c",
+  "accent_color": "#f4a261",
   "sections": [
-    "Dashboard",
-    "Client Management",
-    "Project Workspace",
-    "AI Insights",
-    "Reports"
+    "Strategy Dashboard",
+    "Market Analysis",
+    "Business Insights",
+    "Client Management"
   ],
   "backend_resources": [
-    "users",
-    "clients",
-    "projects",
-    "analyses",
-    "reports"
+    "Strategies",
+    "Markets",
+    "Clients",
+    "Reports"
   ],
   "features": [
-    "AI-powered market analysis",
-    "Client portfolio dashboard",
-    "Collaborative project workspace",
-    "Data visualizations and reports",
-    "Secure user management"
+    "AI-driven business strategy",
+    "Data-driven market entry recommendations",
+    "Fortune 500 consulting"
+  ],
+  "pricing_tiers": [
+    "Enterprise: $25,000/month — Full AI strategy, market entry analysis, and priority support"
+  ],
+  "target_customer": "Fortune 500 companies",
+  "key_metric": "market entry time reduction from 12 weeks to 6 weeks",
+  "hero_stats": [
+    {
+      "value": "50%",
+      "label": "faster market entry analysis"
+    },
+    {
+      "value": "95%",
+      "label": "strategy accuracy rate"
+    },
+    {
+      "value": "200+",
+      "label": "Fortune 500 clients served"
+    }
   ]
 }
