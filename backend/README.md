@@ -1,6 +1,6 @@
-# NovaMind Consulting â€” Backend API
+# NovaMind Consulting - Backend API
 
-App type: **crm**
+App type: **saas_dashboard**
 
 ## Setup
 ```bash
