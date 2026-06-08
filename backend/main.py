@@ -1,524 +1,303 @@
 import os
-from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, Enum as SAEnum
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+import re
+import uuid
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException
+from typing import Optional
+
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import create_engine, text, Column, String, Integer, Float, DateTime, Text, Boolean, Date
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 import uvicorn
-import random
-import enum
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-COMPANY_SLUG = os.environ.get("COMPANY_SLUG", "novamind")
+COMPANY_SLUG = re.sub(r"[^a-z0-9_]", "_", os.environ.get("COMPANY_SLUG", "company").lower())
 PORT = int(os.environ.get("COMPANY_PORT", 8000))
 
 db_engine = None
 SessionLocal = None
 
-
 class Base(DeclarativeBase):
     pass
-
 
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    db_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    db_engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args={"options": f"-csearch_path={COMPANY_SLUG},public"},
+    )
     SessionLocal = sessionmaker(bind=db_engine)
+    with db_engine.connect() as _conn:
+        _conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{COMPANY_SLUG}"'))
+        _conn.commit()
 
-
-# --- Database Models ---
-class UserModel(Base):
-    __tablename__ = f"{COMPANY_SLUG}_users"
-    
-    id = Column(String, primary_key=True)
+class Strategy(Base):
+    __tablename__ = "strategies"
+    __table_args__ = {"schema": COMPANY_SLUG}
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
-    email = Column(String, nullable=False)
-    role = Column(String, nullable=False)
-    department = Column(String, nullable=False)
+    description = Column(Text)
+    approach = Column(String)
+    industry = Column(String)
+    client_id = Column(String)
+    roi_percentage = Column(Float)
+    risk_level = Column(String)
+    status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-
-class ClientModel(Base):
-    __tablename__ = f"{COMPANY_SLUG}_clients"
-    
-    id = Column(String, primary_key=True)
-    company_name = Column(String, nullable=False)
-    industry = Column(String, nullable=False)
-    revenue_range = Column(String, nullable=False)
+class Market(Base):
+    __tablename__ = "markets"
+    __table_args__ = {"schema": COMPANY_SLUG}
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     region = Column(String, nullable=False)
-    status = Column(String, nullable=False)
-    assigned_user_id = Column(String, nullable=True)
+    industry = Column(String)
+    market_size = Column(Float)
+    growth_rate = Column(Float)
+    entry_difficulty = Column(String)
+    key_players = Column(Text)
+    ai_insight = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-
-class ProjectModel(Base):
-    __tablename__ = f"{COMPANY_SLUG}_projects"
-    
-    id = Column(String, primary_key=True)
+class Client(Base):
+    __tablename__ = "clients"
+    __table_args__ = {"schema": COMPANY_SLUG}
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
-    client_id = Column(String, nullable=False)
-    type = Column(String, nullable=False)
-    status = Column(String, nullable=False)
-    budget = Column(Float, nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=True)
-    lead_analyst_id = Column(String, nullable=True)
+    company = Column(String)
+    industry = Column(String)
+    revenue = Column(Float)
+    employee_count = Column(Integer)
+    contact_email = Column(String)
+    contact_phone = Column(String)
+    status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
 
-
-class AnalysisModel(Base):
-    __tablename__ = f"{COMPANY_SLUG}_analyses"
-    
-    id = Column(String, primary_key=True)
-    project_id = Column(String, nullable=False)
-    type = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    status = Column(String, nullable=False)
-    confidence_score = Column(Float, nullable=True)
-    key_findings = Column(Text, nullable=True)
-    created_by = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class ReportModel(Base):
-    __tablename__ = f"{COMPANY_SLUG}_reports"
-    
-    id = Column(String, primary_key=True)
-    project_id = Column(String, nullable=False)
-    analysis_id = Column(String, nullable=False)
+class Report(Base):
+    __tablename__ = "reports"
+    __table_args__ = {"schema": COMPANY_SLUG}
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
-    status = Column(String, nullable=False)
-    executive_summary = Column(Text, nullable=True)
-    recommendations = Column(Text, nullable=True)
-    generated_by = Column(String, nullable=True)
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    type = Column(String)
+    client_id = Column(String)
+    market_id = Column(String)
+    strategy_id = Column(String)
+    summary = Column(Text)
+    key_findings = Column(Text)
+    recommendations = Column(Text)
+    status = Column(String, default="draft")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+if db_engine:
+    Base.metadata.create_all(db_engine)
 
-# --- Mock Data ---
-MOCK_USERS = [
-    {
-        "id": "usr_001",
-        "name": "Dr. Sarah Chen",
-        "email": "sarah.chen@novamind.ai",
-        "role": "Chief AI Strategist",
-        "department": "Strategy",
-        "created_at": "2024-01-15T09:00:00"
-    },
-    {
-        "id": "usr_002",
-        "name": "James Rodriguez",
-        "email": "james.rodriguez@novamind.ai",
-        "role": "Senior Data Analyst",
-        "department": "Analytics",
-        "created_at": "2024-02-01T10:00:00"
-    },
-    {
-        "id": "usr_003",
-        "name": "Emily Nakamura",
-        "email": "emily.nakamura@novamind.ai",
-        "role": "Market Research Lead",
-        "department": "Research",
-        "created_at": "2024-02-15T11:00:00"
-    },
-    {
-        "id": "usr_004",
-        "name": "Marcus Williams",
-        "email": "marcus.williams@novamind.ai",
-        "role": "AI Implementation Specialist",
-        "department": "Technology",
-        "created_at": "2024-03-01T08:00:00"
-    },
-    {
-        "id": "usr_005",
-        "name": "Olivia Patel",
-        "email": "olivia.patel@novamind.ai",
-        "role": "Client Success Director",
-        "department": "Client Relations",
-        "created_at": "2024-03-10T09:30:00"
-    },
-    {
-        "id": "usr_006",
-        "name": "Dr. Robert Kim",
-        "email": "robert.kim@novamind.ai",
-        "role": "Data Science Lead",
-        "department": "Analytics",
-        "created_at": "2024-03-20T10:00:00"
-    }
-]
+def get_db():
+    if not SessionLocal:
+        raise HTTPException(status_code=503, detail="Database not available")
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-MOCK_CLIENTS = [
-    {
-        "id": "cli_001",
-        "company_name": "GlobalTech Industries",
-        "industry": "Technology",
-        "revenue_range": "$10B-$50B",
-        "region": "North America",
-        "status": "active",
-        "assigned_user_id": "usr_001",
-        "created_at": "2024-01-20T09:00:00"
-    },
-    {
-        "id": "cli_002",
-        "company_name": "EuroFinance Group",
-        "industry": "Financial Services",
-        "revenue_range": "$5B-$20B",
-        "region": "Europe",
-        "status": "active",
-        "assigned_user_id": "usr_005",
-        "created_at": "2024-02-05T10:00:00"
-    },
-    {
-        "id": "cli_003",
-        "company_name": "Pacific Health Systems",
-        "industry": "Healthcare",
-        "revenue_range": "$3B-$15B",
-        "region": "Asia Pacific",
-        "status": "active",
-        "assigned_user_id": "usr_003",
-        "created_at": "2024-02-18T11:00:00"
-    },
-    {
-        "id": "cli_004",
-        "company_name": "RetailMax Corporation",
-        "industry": "Retail",
-        "revenue_range": "$2B-$10B",
-        "region": "North America",
-        "status": "onboarding",
-        "assigned_user_id": "usr_005",
-        "created_at": "2024-03-05T09:00:00"
-    },
-    {
-        "id": "cli_005",
-        "company_name": "GreenEnergy Solutions",
-        "industry": "Energy",
-        "revenue_range": "$1B-$5B",
-        "region": "Europe",
-        "status": "proposal",
-        "assigned_user_id": "usr_001",
-        "created_at": "2024-03-15T10:00:00"
-    },
-    {
-        "id": "cli_006",
-        "company_name": "AeroSpace Dynamics",
-        "industry": "Aerospace",
-        "revenue_range": "$8B-$30B",
-        "region": "North America",
-        "status": "active",
-        "assigned_user_id": "usr_002",
-        "created_at": "2024-03-22T11:00:00"
-    },
-    {
-        "id": "cli_007",
-        "company_name": "MediTech Innovations",
-        "industry": "Healthcare Technology",
-        "revenue_range": "$500M-$2B",
-        "region": "Europe",
-        "status": "onboarding",
-        "assigned_user_id": "usr_003",
-        "created_at": "2024-04-01T09:00:00"
-    }
-]
+def _seed_if_empty(db: Session):
+    if db.query(Strategy).count() == 0:
+        strategies = [
+            Strategy(
+                id=str(uuid.uuid4()),
+                name="AI-Powered Market Disruption",
+                description="Leverage machine learning to identify and exploit market gaps in emerging economies",
+                approach="Predictive analytics + scenario modeling",
+                industry="Technology",
+                roi_percentage=340.0,
+                risk_level="Moderate",
+                status="active"
+            ),
+            Strategy(
+                id=str(uuid.uuid4()),
+                name="Digital Transformation Roadmap",
+                description="End-to-end digital transformation strategy for traditional manufacturing firms",
+                approach="Agile transformation + AI automation",
+                industry="Manufacturing",
+                roi_percentage=280.0,
+                risk_level="Low",
+                status="active"
+            ),
+            Strategy(
+                id=str(uuid.uuid4()),
+                name="Healthcare Market Entry Framework",
+                description="Regulatory-aware market entry strategy for health-tech companies entering European markets",
+                approach="Compliance-first expansion",
+                industry="Healthcare",
+                roi_percentage=220.0,
+                risk_level="High",
+                status="draft"
+            ),
+            Strategy(
+                id=str(uuid.uuid4()),
+                name="Sustainable Energy Transition Plan",
+                description="Strategic roadmap for energy companies transitioning to renewable sources",
+                approach="Phased decarbonization + carbon credit optimization",
+                industry="Energy",
+                roi_percentage=190.0,
+                risk_level="Moderate",
+                status="review"
+            ),
+        ]
+        db.add_all(strategies)
 
-MOCK_PROJECTS = [
-    {
-        "id": "prj_001",
-        "name": "Global Market Entry Strategy - APAC",
-        "client_id": "cli_001",
-        "type": "Market Entry",
-        "status": "in_progress",
-        "budget": 2500000.00,
-        "start_date": "2024-03-01T00:00:00",
-        "end_date": "2024-09-30T00:00:00",
-        "lead_analyst_id": "usr_001",
-        "created_at": "2024-02-15T09:00:00"
-    },
-    {
-        "id": "prj_002",
-        "name": "AI-Driven Cost Optimization",
-        "client_id": "cli_002",
-        "type": "Operational Efficiency",
-        "status": "in_progress",
-        "budget": 1800000.00,
-        "start_date": "2024-03-15T00:00:00",
-        "end_date": "2024-10-15T00:00:00",
-        "lead_analyst_id": "usr_006",
-        "created_at": "2024-02-28T10:00:00"
-    },
-    {
-        "id": "prj_003",
-        "name": "Healthcare Digital Transformation",
-        "client_id": "cli_003",
-        "type": "Digital Transformation",
-        "status": "planning",
-        "budget": 3200000.00,
-        "start_date": "2024-04-01T00:00:00",
-        "end_date": "2025-03-31T00:00:00",
-        "lead_analyst_id": "usr_003",
-        "created_at": "2024-03-10T11:00:00"
-    },
-    {
-        "id": "prj_004",
-        "name": "Retail Analytics Platform",
-        "client_id": "cli_004",
-        "type": "Technology Implementation",
-        "status": "planning",
-        "budget": 1500000.00,
-        "start_date": "2024-05-01T00:00:00",
-        "end_date": "2024-12-31T00:00:00",
-        "lead_analyst_id": "usr_004",
-        "created_at": "2024-03-20T09:00:00"
-    },
-    {
-        "id": "prj_005",
-        "name": "Renewable Energy Market Analysis",
-        "client_id": "cli_005",
-        "type": "Market Research",
-        "status": "proposal",
-        "budget": 800000.00,
-        "start_date": "2024-06-01T00:00:00",
-        "end_date": "2024-11-30T00:00:00",
-        "lead_analyst_id": "usr_002",
-        "created_at": "2024-04-01T10:00:00"
-    },
-    {
-        "id": "prj_006",
-        "name": "Supply Chain AI Optimization",
-        "client_id": "cli_006",
-        "type": "AI Implementation",
-        "status": "in_progress",
-        "budget": 2800000.00,
-        "start_date": "2024-02-01T00:00:00",
-        "end_date": "2024-11-30T00:00:00",
-        "lead_analyst_id": "usr_004",
-        "created_at": "2024-01-20T11:00:00"
-    },
-    {
-        "id": "prj_007",
-        "name": "MedTech Go-to-Market Strategy",
-        "client_id": "cli_007",
-        "type": "Market Entry",
-        "status": "planning",
-        "budget": 1200000.00,
-        "start_date": "2024-05-15T00:00:00",
-        "end_date": "2025-02-28T00:00:00",
-        "lead_analyst_id": "usr_003",
-        "created_at": "2024-04-10T09:00:00"
-    }
-]
+        markets = [
+            Market(
+                id=str(uuid.uuid4()),
+                region="Southeast Asia",
+                industry="Technology",
+                market_size=850000000000.0,
+                growth_rate=14.5,
+                entry_difficulty="Medium",
+                key_players="Grab, Gojek, Sea Limited, Alibaba",
+                ai_insight="Digital adoption rate accelerating 3x faster than global average"
+            ),
+            Market(
+                id=str(uuid.uuid4()),
+                region="Nordic Countries",
+                industry="Healthcare",
+                market_size=320000000000.0,
+                growth_rate=8.2,
+                entry_difficulty="High",
+                key_players="Novo Nordisk, AstraZeneca, Getinge",
+                ai_insight="Strong regulatory framework but high adoption of digital health solutions"
+            ),
+            Market(
+                id=str(uuid.uuid4()),
+                region="Middle East",
+                industry="Energy",
+                market_size=1200000000000.0,
+                growth_rate=6.8,
+                entry_difficulty="Medium",
+                key_players="Saudi Aramco, ADNOC, Qatar Energy",
+                ai_insight="Government diversification mandates creating new opportunities in renewables"
+            ),
+            Market(
+                id=str(uuid.uuid4()),
+                region="Latin America",
+                industry="Financial Services",
+                market_size=450000000000.0,
+                growth_rate=11.3,
+                entry_difficulty="Medium",
+                key_players="Nubank, Mercado Pago, PicPay",
+                ai_insight="Fintech adoption outpacing traditional banking 4:1 in unbanked populations"
+            ),
+        ]
+        db.add_all(markets)
 
-MOCK_ANALYSES = [
-    {
-        "id": "anl_001",
-        "project_id": "prj_001",
-        "type": "Competitive Landscape",
-        "description": "Deep analysis of competitors in Southeast Asian markets",
-        "status": "completed",
-        "confidence_score": 0.92,
-        "key_findings": "Three major competitors identified; market gap in mid-tier pricing",
-        "created_by": "usr_002",
-        "created_at": "2024-03-20T14:00:00"
-    },
-    {
-        "id": "anl_002",
-        "project_id": "prj_001",
-        "type": "Customer Segmentation",
-        "description": "AI-driven customer segmentation for APAC markets",
-        "status": "in_progress",
-        "confidence_score": 0.85,
-        "key_findings": "Four distinct segments identified; premium segment shows 40% growth potential",
-        "created_by": "usr_003",
-        "created_at": "2024-04-05T10:00:00"
-    },
-    {
-        "id": "anl_003",
-        "project_id": "prj_002",
-        "type": "Process Mining",
-        "description": "Analyzing operational workflows for AI optimization opportunities",
-        "status": "completed",
-        "confidence_score": 0.88,
-        "key_findings": "32% reduction potential in operational costs through AI automation",
-        "created_by": "usr_006",
-        "created_at": "2024-03-28T09:00:00"
-    },
-    {
-        "id": "anl_004",
-        "project_id": "prj_003",
-        "type": "Technology Assessment",
-        "description": "Evaluating current tech stack for digital transformation readiness",
-        "status": "completed",
-        "confidence_score": 0.90,
-        "key_findings": "Legacy system migration needed; recommended cloud-native architecture",
-        "created_by": "usr_004",
-        "created_at": "2024-04-01T11:00:00"
-    },
-    {
-        "id": "anl_005",
-        "project_id": "prj_006",
-        "type": "Supply Chain Analytics",
-        "description": "AI-powered supply chain optimization analysis",
-        "status": "completed",
-        "confidence_score": 0.94,
-        "key_findings": "18% improvement in logistics efficiency achievable with ML routing",
-        "created_by": "usr_002",
-        "created_at": "2024-03-15T15:00:00"
-    },
-    {
-        "id": "anl_006",
-        "project_id": "prj_006",
-        "type": "Predictive Maintenance",
-        "description": "AI models for predicting equipment maintenance needs",
-        "status": "in_progress",
-        "confidence_score": 0.82,
-        "key_findings": "Predictive accuracy at 87%; potential for 25% reduction in downtime",
-        "created_by": "usr_006",
-        "created_at": "2024-04-08T13:00:00"
-    },
-    {
-        "id": "anl_007",
-        "project_id": "prj_001",
-        "type": "Regulatory Analysis",
-        "description": "Compliance and regulatory landscape assessment for APAC entry",
-        "status": "completed",
-        "confidence_score": 0.91,
-        "key_findings": "Moderate regulatory barriers; data localization requirements in 3 countries",
-        "created_by": "usr_001",
-        "created_at": "2024-04-10T08:00:00"
-    }
-]
+        clients = [
+            Client(
+                id=str(uuid.uuid4()),
+                name="Sarah Chen",
+                company="TechVentures Global",
+                industry="Technology",
+                revenue=2500000000.0,
+                employee_count=3400,
+                contact_email="schen@techventures.com",
+                contact_phone="+1-415-555-0123",
+                status="active"
+            ),
+            Client(
+                id=str(uuid.uuid4()),
+                name="Marcus Rodriguez",
+                company="MediCorp International",
+                industry="Healthcare",
+                revenue=5800000000.0,
+                employee_count=12000,
+                contact_email="mrodriguez@medicorp.com",
+                contact_phone="+1-617-555-0456",
+                status="active"
+            ),
+            Client(
+                id=str(uuid.uuid4()),
+                name="Emma Williams",
+                company="GreenFuture Energy",
+                industry="Energy",
+                revenue=8900000000.0,
+                employee_count=8500,
+                contact_email="ewilliams@greenfuture.com",
+                contact_phone="+44-20-7946-0789",
+                status="review"
+            ),
+            Client(
+                id=str(uuid.uuid4()),
+                name="Dr. Akira Tanaka",
+                company="FinServe Asia",
+                industry="Financial Services",
+                revenue=12000000000.0,
+                employee_count=15000,
+                contact_email="atanaka@finserve.com",
+                contact_phone="+65-6234-5678",
+                status="active"
+            ),
+        ]
+        db.add_all(clients)
 
-MOCK_REPORTS = [
-    {
-        "id": "rpt_001",
-        "project_id": "prj_001",
-        "analysis_id": "anl_001",
-        "title": "Competitive Landscape Report: Southeast Asia",
-        "status": "final",
-        "executive_summary": "Comprehensive analysis reveals significant market opportunity in emerging economies of Southeast Asia, with projected CAGR of 15.2% over next 3 years.",
-        "recommendations": "Focus on mid-market segment first; leverage partnerships with local distributors; invest in localized AI solutions",
-        "generated_by": "usr_001",
-        "generated_at": "2024-04-01T16:00:00"
-    },
-    {
-        "id": "rpt_002",
-        "project_id": "prj_002",
-        "analysis_id": "anl_003",
-        "title": "Operational Efficiency Optimization Report",
-        "status": "final",
-        "executive_summary": "AI-driven process mining identified $580M in annual cost savings opportunities across 12 key operational areas.",
-        "recommendations": "Implement RPA in 6 high-impact processes; deploy ML-based demand forecasting; automate invoice processing",
-        "generated_by": "usr_006",
-        "generated_at": "2024-04-10T14:00:00"
-    },
-    {
-        "id": "rpt_003",
-        "project_id": "prj_003",
-        "analysis_id": "anl_004",
-        "title": "Digital Transformation Readiness Assessment",
-        "status": "draft",
-        "executive_summary": "Organization shows 65% digital maturity score; critical gaps identified in data infrastructure and workforce skills.",
-        "recommendations": "Phased migration to cloud; invest in data lakes; comprehensive training program for 2,000 employees",
-        "generated_by": "usr_004",
-        "generated_at": "2024-04-15T11:00:00"
-    },
-    {
-        "id": "rpt_004",
-        "project_id": "prj_006",
-        "analysis_id": "anl_005",
-        "title": "Supply Chain AI Optimization: Phase 1 Results",
-        "status": "final",
-        "executive_summary": "Initial AI implementation shows 12% cost reduction in logistics operations with full-scale rollout projected to achieve 18% savings.",
-        "recommendations": "Expand ML routing to all distribution centers; integrate real-time demand sensing; automated supplier selection",
-        "generated_by": "usr_002",
-        "generated_at": "2024-04-05T09:00:00"
-    },
-    {
-        "id": "rpt_005",
-        "project_id": "prj_001",
-        "analysis_id": "anl_007",
-        "title": "APAC Regulatory Compliance Analysis",
-        "status": "final",
-        "executive_summary": "Regulatory environment ranges from favorable (Singapore, Vietnam) to restrictive (China, India). Data sovereignty and AI ethics laws pose key challenges.",
-        "recommendations": "Establish local data centers in key markets; partner with regional compliance firms; develop AI ethics framework",
-        "generated_by": "usr_001",
-        "generated_at": "2024-04-18T15:00:00"
-    },
-    {
-        "id": "rpt_006",
-        "project_id": "prj_002",
-        "analysis_id": "anl_003",
-        "title": "Quarterly Performance Dashboard",
-        "status": "draft",
-        "executive_summary": "Q1 2024 performance exceeds targets by 15% in cost reduction initiatives; customer satisfaction score at 4.2/5.0.",
-        "recommendations": "Scale successful automation to additional departments; invest in customer success team; Q2 target: 22% cost reduction",
-        "generated_by": "usr_006",
-        "generated_at": "2024-04-20T13:00:00"
-    },
-    {
-        "id": "rpt_007",
-        "project_id": "prj_001",
-        "analysis_id": "anl_002",
-        "title": "APAC Customer Segmentation Analysis",
-        "status": "draft",
-        "executive_summary": "Preliminary segmentation identifies 4 primary customer personas with distinct needs and willingness to pay for AI-powered solutions.",
-        "recommendations": "Develop targeted marketing campaigns for each segment; premium pricing strategy for enterprise tier",
-        "generated_by": "usr_003",
-        "generated_at": "2024-04-22T10:00:00"
-    }
-]
+        reports = [
+            Report(
+                id=str(uuid.uuid4()),
+                title="SE Asia Tech Market Entry Analysis",
+                type="Market Analysis",
+                market_id=markets[0].id,
+                client_id=clients[0].id,
+                summary="Comprehensive analysis of Southeast Asian technology market with AI-powered competitive intelligence",
+                key_findings="Three key market gaps identified in ed-tech, logistics automation, and digital banking",
+                recommendations="Partner with local logistics providers and pursue regulatory sandbox programs",
+                status="completed"
+            ),
+            Report(
+                id=str(uuid.uuid4()),
+                title="Healthcare Regulatory Compliance Framework",
+                type="Strategy Report",
+                market_id=markets[1].id,
+                client_id=clients[1].id,
+                summary="EU-wide regulatory compliance strategy for health-tech market expansion",
+                key_findings="MDR certification timeline can be compressed by 40% using AI-assisted documentation",
+                recommendations="Begin parallel certification processes in Germany and Netherlands as test markets",
+                status="draft"
+            ),
+            Report(
+                id=str(uuid.uuid4()),
+                title="Renewable Energy Investment Roadmap",
+                type="Investment Strategy",
+                market_id=markets[2].id,
+                client_id=clients[2].id,
+                summary="Strategic investment plan for transitioning 60% of portfolio to renewable assets by 2030",
+                key_findings="Solar and wind investments show 22% higher IRR than traditional energy in current conditions",
+                recommendations="Phased approach: 30% allocation to solar in Year 1, 40% to wind in Year 2, 30% to emerging tech Year 3",
+                status="review"
+            ),
+            Report(
+                id=str(uuid.uuid4()),
+                title="Digital Banking Disruption Strategy",
+                type="Competitive Analysis",
+                market_id=markets[3].id,
+                client_id=clients[3].id,
+                summary="Analysis of fintech disruptors in Latin America and defensive strategy for traditional banks",
+                key_findings="Nubank's AI-based credit scoring model reduces default rates by 35% vs traditional methods",
+                recommendations="Acquire or partner with leading fintech platform; invest in AI-native banking infrastructure",
+                status="completed"
+            ),
+        ]
+        db.add_all(reports)
 
+        db.commit()
+        print(f"[{COMPANY_SLUG}] Seeded initial data")
 
-# --- Pydantic Models ---
-class UserCreate(BaseModel):
-    name: str
-    email: str
-    role: str
-    department: str
+if db_engine:
+    with SessionLocal() as db:
+        _seed_if_empty(db)
 
-
-class ClientCreate(BaseModel):
-    company_name: str
-    industry: str
-    revenue_range: str
-    region: str
-    status: str = "proposal"
-    assigned_user_id: str = None
-
-
-class ProjectCreate(BaseModel):
-    name: str
-    client_id: str
-    type: str
-    status: str = "planning"
-    budget: float
-    start_date: str
-    end_date: str = None
-    lead_analyst_id: str = None
-
-
-class AnalysisCreate(BaseModel):
-    project_id: str
-    type: str
-    description: str = None
-    status: str = "planned"
-    confidence_score: float = None
-    key_findings: str = None
-    created_by: str = None
-
-
-class ReportCreate(BaseModel):
-    project_id: str
-    analysis_id: str
-    title: str
-    status: str = "draft"
-    executive_summary: str = None
-    recommendations: str = None
-    generated_by: str = None
-
-
-# --- FastAPI App ---
-app = FastAPI(title="NovaMind AI", version="1.0.0")
+app = FastAPI(title="NovaMind Consulting API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -527,440 +306,435 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Pydantic models
+class StrategyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    approach: Optional[str] = None
+    industry: Optional[str] = None
+    client_id: Optional[str] = None
+    roi_percentage: Optional[float] = None
+    risk_level: Optional[str] = None
+    status: Optional[str] = "active"
 
-@app.on_event("startup")
-async def startup():
-    if db_engine:
-        Base.metadata.create_all(db_engine)
+class StrategyResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    approach: Optional[str] = None
+    industry: Optional[str] = None
+    client_id: Optional[str] = None
+    roi_percentage: Optional[float] = None
+    risk_level: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
 
+class MarketCreate(BaseModel):
+    region: str
+    industry: Optional[str] = None
+    market_size: Optional[float] = None
+    growth_rate: Optional[float] = None
+    entry_difficulty: Optional[str] = None
+    key_players: Optional[str] = None
+    ai_insight: Optional[str] = None
 
-# --- Helper Functions ---
-def get_db():
-    if SessionLocal:
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-    else:
-        yield None
+class MarketResponse(BaseModel):
+    id: str
+    region: str
+    industry: Optional[str] = None
+    market_size: Optional[float] = None
+    growth_rate: Optional[float] = None
+    entry_difficulty: Optional[str] = None
+    key_players: Optional[str] = None
+    ai_insight: Optional[str] = None
+    created_at: datetime
 
+class ClientCreate(BaseModel):
+    name: str
+    company: Optional[str] = None
+    industry: Optional[str] = None
+    revenue: Optional[float] = None
+    employee_count: Optional[int] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: Optional[str] = "active"
 
-def generate_id(prefix: str) -> str:
-    return f"{prefix}_{random.randint(100, 999)}"
+class ClientResponse(BaseModel):
+    id: str
+    name: str
+    company: Optional[str] = None
+    industry: Optional[str] = None
+    revenue: Optional[float] = None
+    employee_count: Optional[int] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str
+    created_at: datetime
 
+class ReportCreate(BaseModel):
+    title: str
+    type: Optional[str] = None
+    client_id: Optional[str] = None
+    market_id: Optional[str] = None
+    strategy_id: Optional[str] = None
+    summary: Optional[str] = None
+    key_findings: Optional[str] = None
+    recommendations: Optional[str] = None
+    status: Optional[str] = "draft"
 
-# --- Health & Info Endpoints ---
+class ReportResponse(BaseModel):
+    id: str
+    title: str
+    type: Optional[str] = None
+    client_id: Optional[str] = None
+    market_id: Optional[str] = None
+    strategy_id: Optional[str] = None
+    summary: Optional[str] = None
+    key_findings: Optional[str] = None
+    recommendations: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+# Health & Info
 @app.get("/health")
-async def health():
-    return {"status": "ok", "app": "NovaMind AI", "version": "1.0.0"}
-
+def health_check():
+    return {"status": "ok", "schema": COMPANY_SLUG, "db": bool(db_engine)}
 
 @app.get("/api/info")
-async def get_info():
+def company_info():
     return {
         "name": "NovaMind Consulting",
-        "app_name": "NovaMind AI",
-        "tagline": "Transforming Fortune 500 Strategy with Artificial Intelligence",
+        "tagline": "AI-Powered Strategy for Fortune 500",
+        "description": "A consulting firm that uses AI to provide Fortune 500 companies with data-driven business strategy and market entry recommendations.",
         "founded": "2019",
-        "team_size": 150,
         "headquarters": "San Francisco, CA",
-        "specialties": [
-            "AI Strategy Consulting",
-            "Market Entry Analytics",
-            "Operational AI Implementation",
-            "Predictive Business Intelligence"
-        ],
-        "clients_served": 47,
-        "ai_models_deployed": 230
+        "team_size": 180,
+        "specialties": ["AI Strategy", "Market Entry", "Data Analytics", "Digital Transformation"],
+        "industries": ["Technology", "Healthcare", "Energy", "Financial Services"],
+        "notable_clients": 42,
+        "success_rate": 94.7
     }
 
+# Strategies endpoints
+@app.get("/api/strategies", response_model=list[StrategyResponse])
+def list_strategies(db: Session = Depends(get_db)):
+    return db.query(Strategy).order_by(Strategy.created_at.desc()).all()
 
+@app.post("/api/strategies", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
+def create_strategy(strategy: StrategyCreate, db: Session = Depends(get_db)):
+    db_strategy = Strategy(
+        id=str(uuid.uuid4()),
+        name=strategy.name,
+        description=strategy.description,
+        approach=strategy.approach,
+        industry=strategy.industry,
+        client_id=strategy.client_id,
+        roi_percentage=strategy.roi_percentage,
+        risk_level=strategy.risk_level,
+        status=strategy.status
+    )
+    db.add(db_strategy)
+    db.commit()
+    db.refresh(db_strategy)
+    return db_strategy
+
+@app.get("/api/strategies/{strategy_id}", response_model=StrategyResponse)
+def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return strategy
+
+@app.put("/api/strategies/{strategy_id}", response_model=StrategyResponse)
+def update_strategy(strategy_id: str, strategy: StrategyCreate, db: Session = Depends(get_db)):
+    db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    for key, value in strategy.dict(exclude_unset=True).items():
+        setattr(db_strategy, key, value)
+    db_strategy.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(db_strategy)
+    return db_strategy
+
+@app.delete("/api/strategies/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    db.delete(strategy)
+    db.commit()
+
+# Markets endpoints
+@app.get("/api/markets", response_model=list[MarketResponse])
+def list_markets(db: Session = Depends(get_db)):
+    return db.query(Market).order_by(Market.created_at.desc()).all()
+
+@app.post("/api/markets", response_model=MarketResponse, status_code=status.HTTP_201_CREATED)
+def create_market(market: MarketCreate, db: Session = Depends(get_db)):
+    db_market = Market(
+        id=str(uuid.uuid4()),
+        region=market.region,
+        industry=market.industry,
+        market_size=market.market_size,
+        growth_rate=market.growth_rate,
+        entry_difficulty=market.entry_difficulty,
+        key_players=market.key_players,
+        ai_insight=market.ai_insight
+    )
+    db.add(db_market)
+    db.commit()
+    db.refresh(db_market)
+    return db_market
+
+@app.get("/api/markets/{market_id}", response_model=MarketResponse)
+def get_market(market_id: str, db: Session = Depends(get_db)):
+    market = db.query(Market).filter(Market.id == market_id).first()
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    return market
+
+@app.put("/api/markets/{market_id}", response_model=MarketResponse)
+def update_market(market_id: str, market: MarketCreate, db: Session = Depends(get_db)):
+    db_market = db.query(Market).filter(Market.id == market_id).first()
+    if not db_market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    for key, value in market.dict(exclude_unset=True).items():
+        setattr(db_market, key, value)
+    db.commit()
+    db.refresh(db_market)
+    return db_market
+
+@app.delete("/api/markets/{market_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_market(market_id: str, db: Session = Depends(get_db)):
+    market = db.query(Market).filter(Market.id == market_id).first()
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    db.delete(market)
+    db.commit()
+
+# Clients endpoints
+@app.get("/api/clients", response_model=list[ClientResponse])
+def list_clients(db: Session = Depends(get_db)):
+    return db.query(Client).order_by(Client.created_at.desc()).all()
+
+@app.post("/api/clients", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+def create_client(client: ClientCreate, db: Session = Depends(get_db)):
+    db_client = Client(
+        id=str(uuid.uuid4()),
+        name=client.name,
+        company=client.company,
+        industry=client.industry,
+        revenue=client.revenue,
+        employee_count=client.employee_count,
+        contact_email=client.contact_email,
+        contact_phone=client.contact_phone,
+        status=client.status
+    )
+    db.add(db_client)
+    db.commit()
+    db.refresh(db_client)
+    return db_client
+
+@app.get("/api/clients/{client_id}", response_model=ClientResponse)
+def get_client(client_id: str, db: Session = Depends(get_db)):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
+
+@app.put("/api/clients/{client_id}", response_model=ClientResponse)
+def update_client(client_id: str, client: ClientCreate, db: Session = Depends(get_db)):
+    db_client = db.query(Client).filter(Client.id == client_id).first()
+    if not db_client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    for key, value in client.dict(exclude_unset=True).items():
+        setattr(db_client, key, value)
+    db.commit()
+    db.refresh(db_client)
+    return db_client
+
+@app.delete("/api/clients/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_client(client_id: str, db: Session = Depends(get_db)):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    db.delete(client)
+    db.commit()
+
+# Reports endpoints
+@app.get("/api/reports", response_model=list[ReportResponse])
+def list_reports(db: Session = Depends(get_db)):
+    return db.query(Report).order_by(Report.created_at.desc()).all()
+
+@app.post("/api/reports", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)
+def create_report(report: ReportCreate, db: Session = Depends(get_db)):
+    db_report = Report(
+        id=str(uuid.uuid4()),
+        title=report.title,
+        type=report.type,
+        client_id=report.client_id,
+        market_id=report.market_id,
+        strategy_id=report.strategy_id,
+        summary=report.summary,
+        key_findings=report.key_findings,
+        recommendations=report.recommendations,
+        status=report.status
+    )
+    db.add(db_report)
+    db.commit()
+    db.refresh(db_report)
+    return db_report
+
+@app.get("/api/reports/{report_id}", response_model=ReportResponse)
+def get_report(report_id: str, db: Session = Depends(get_db)):
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+@app.put("/api/reports/{report_id}", response_model=ReportResponse)
+def update_report(report_id: str, report: ReportCreate, db: Session = Depends(get_db)):
+    db_report = db.query(Report).filter(Report.id == report_id).first()
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    for key, value in report.dict(exclude_unset=True).items():
+        setattr(db_report, key, value)
+    db_report.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(db_report)
+    return db_report
+
+@app.delete("/api/reports/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_report(report_id: str, db: Session = Depends(get_db)):
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    db.delete(report)
+    db.commit()
+
+# Metrics endpoint
 @app.get("/api/metrics")
-async def get_metrics():
-    return {
-        "active_projects": 42,
-        "total_revenue_ytd": 18500000.00,
-        "avg_project_value": 2100000.00,
-        "client_satisfaction_score": 4.7,
-        "ai_accuracy_rate": 0.94,
-        "project_completion_rate": 0.88,
-        "team_utilization": 0.82,
-        "new_clients_this_quarter": 8,
-        "analyses_conducted": 156,
-        "reports_generated": 89
-    }
-
-
-# --- CRM Domain Endpoints ---
-@app.get("/api/contacts")
-async def get_contacts():
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            users = db.query(UserModel).all()
-            return [
-                {
-                    "id": u.id,
-                    "name": u.name,
-                    "email": u.email,
-                    "role": u.role,
-                    "department": u.department,
-                    "created_at": u.created_at.isoformat()
-                }
-                for u in users
-            ]
-        finally:
-            db.close()
-    return MOCK_USERS
-
-
-@app.post("/api/contacts")
-async def create_contact(contact: UserCreate):
-    new_id = generate_id("usr")
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            new_user = UserModel(
-                id=new_id,
-                name=contact.name,
-                email=contact.email,
-                role=contact.role,
-                department=contact.department,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
-            return {
-                "id": new_user.id,
-                "name": new_user.name,
-                "email": new_user.email,
-                "role": new_user.role,
-                "department": new_user.department,
-                "created_at": new_user.created_at.isoformat()
-            }
-        finally:
-            db.close()
-    else:
-        new_item = {
-            "id": new_id,
-            "name": contact.name,
-            "email": contact.email,
-            "role": contact.role,
-            "department": contact.department,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        MOCK_USERS.append(new_item)
-        return new_item
-
-
-@app.get("/api/deals")
-async def get_deals():
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            projects = db.query(ProjectModel).all()
-            return [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "client_id": p.client_id,
-                    "type": p.type,
-                    "status": p.status,
-                    "budget": p.budget,
-                    "start_date": p.start_date.isoformat(),
-                    "end_date": p.end_date.isoformat() if p.end_date else None,
-                    "lead_analyst_id": p.lead_analyst_id,
-                    "created_at": p.created_at.isoformat()
-                }
-                for p in projects
-            ]
-        finally:
-            db.close()
-    return MOCK_PROJECTS
-
-
-@app.post("/api/deals")
-async def create_deal(deal: ProjectCreate):
-    new_id = generate_id("prj")
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            new_project = ProjectModel(
-                id=new_id,
-                name=deal.name,
-                client_id=deal.client_id,
-                type=deal.type,
-                status=deal.status,
-                budget=deal.budget,
-                start_date=datetime.fromisoformat(deal.start_date),
-                end_date=datetime.fromisoformat(deal.end_date) if deal.end_date else None,
-                lead_analyst_id=deal.lead_analyst_id,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_project)
-            db.commit()
-            db.refresh(new_project)
-            return {
-                "id": new_project.id,
-                "name": new_project.name,
-                "client_id": new_project.client_id,
-                "type": new_project.type,
-                "status": new_project.status,
-                "budget": new_project.budget,
-                "start_date": new_project.start_date.isoformat(),
-                "end_date": new_project.end_date.isoformat() if new_project.end_date else None,
-                "lead_analyst_id": new_project.lead_analyst_id,
-                "created_at": new_project.created_at.isoformat()
-            }
-        finally:
-            db.close()
-    else:
-        new_item = {
-            "id": new_id,
-            "name": deal.name,
-            "client_id": deal.client_id,
-            "type": deal.type,
-            "status": deal.status,
-            "budget": deal.budget,
-            "start_date": deal.start_date,
-            "end_date": deal.end_date,
-            "lead_analyst_id": deal.lead_analyst_id,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        MOCK_PROJECTS.append(new_item)
-        return new_item
-
-
-@app.get("/api/pipeline")
-async def get_pipeline():
-    stages = {
-        "proposal": [],
-        "planning": [],
-        "in_progress": [],
-        "completed": []
-    }
-    projects = MOCK_PROJECTS if not SessionLocal else []
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            projects = db.query(ProjectModel).all()
-        finally:
-            db.close()
+def get_metrics(db: Session = Depends(get_db)):
+    strategies_count = db.query(Strategy).count()
+    markets_count = db.query(Market).count()
+    clients_count = db.query(Client).count()
+    reports_count = db.query(Report).count()
     
-    for p in projects:
-        stage = p.status if p.status in stages else "planning"
-        stages[stage].append({
-            "id": p.id if isinstance(p.id, str) else p.id,
-            "name": p.name if isinstance(p.name, str) else p.name,
-            "client_id": p.client_id if isinstance(p.client_id, str) else p.client_id,
-            "type": p.type if isinstance(p.type, str) else p.type,
-            "budget": p.budget if isinstance(p.budget, (int, float)) else p.budget,
-            "start_date": (p.start_date.isoformat() if hasattr(p, 'start_date') and p.start_date else str(p.start_date)) if not isinstance(p, dict) else p.get("start_date", ""),
-            "lead": p.lead_analyst_id if isinstance(p.lead_analyst_id, str) else p.lead_analyst_id
-        })
+    active_clients = db.query(Client).filter(Client.status == "active").count()
+    completed_reports = db.query(Report).filter(Report.status == "completed").count()
+    
+    avg_roi = db.query(Strategy.roi_percentage).filter(Strategy.roi_percentage.isnot(None)).all()
+    avg_roi_value = sum(r[0] for r in avg_roi) / len(avg_roi) if avg_roi else 0
+    
+    total_market_value = db.query(Market.market_size).filter(Market.market_size.isnot(None)).all()
+    total_market = sum(m[0] for m in total_market_value) if total_market_value else 0
     
     return {
-        "stages": stages,
-        "totals": {k: len(v) for k, v in stages.items()}
+        "total_strategies": strategies_count,
+        "total_markets": markets_count,
+        "total_clients": clients_count,
+        "total_reports": reports_count,
+        "active_clients": active_clients,
+        "completed_reports": completed_reports,
+        "average_roi_percentage": round(avg_roi_value, 2),
+        "total_market_value_analyzed": round(total_market, 2),
+        "success_rate": 94.7
     }
 
-
-@app.get("/api/analyses")
-async def get_analyses():
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            analyses = db.query(AnalysisModel).all()
-            return [
-                {
-                    "id": a.id,
-                    "project_id": a.project_id,
-                    "type": a.type,
-                    "description": a.description,
-                    "status": a.status,
-                    "confidence_score": a.confidence_score,
-                    "key_findings": a.key_findings,
-                    "created_by": a.created_by,
-                    "created_at": a.created_at.isoformat()
-                }
-                for a in analyses
-            ]
-        finally:
-            db.close()
-    return MOCK_ANALYSES
-
-
-@app.post("/api/analyses")
-async def create_analysis(analysis: AnalysisCreate):
-    new_id = generate_id("anl")
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            new_analysis = AnalysisModel(
-                id=new_id,
-                project_id=analysis.project_id,
-                type=analysis.type,
-                description=analysis.description,
-                status=analysis.status,
-                confidence_score=analysis.confidence_score,
-                key_findings=analysis.key_findings,
-                created_by=analysis.created_by,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_analysis)
-            db.commit()
-            db.refresh(new_analysis)
-            return {
-                "id": new_analysis.id,
-                "project_id": new_analysis.project_id,
-                "type": new_analysis.type,
-                "description": new_analysis.description,
-                "status": new_analysis.status,
-                "confidence_score": new_analysis.confidence_score,
-                "key_findings": new_analysis.key_findings,
-                "created_by": new_analysis.created_by,
-                "created_at": new_analysis.created_at.isoformat()
-            }
-        finally:
-            db.close()
-    else:
-        new_item = {
-            "id": new_id,
-            "project_id": analysis.project_id,
-            "type": analysis.type,
-            "description": analysis.description,
-            "status": analysis.status,
-            "confidence_score": analysis.confidence_score,
-            "key_findings": analysis.key_findings,
-            "created_by": analysis.created_by,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        MOCK_ANALYSES.append(new_item)
-        return new_item
-
-
-@app.get("/api/reports")
-async def get_reports():
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            reports = db.query(ReportModel).all()
-            return [
-                {
-                    "id": r.id,
-                    "project_id": r.project_id,
-                    "analysis_id": r.analysis_id,
-                    "title": r.title,
-                    "status": r.status,
-                    "executive_summary": r.executive_summary,
-                    "recommendations": r.recommendations,
-                    "generated_by": r.generated_by,
-                    "generated_at": r.generated_at.isoformat()
-                }
-                for r in reports
-            ]
-        finally:
-            db.close()
-    return MOCK_REPORTS
-
-
-@app.post("/api/reports")
-async def create_report(report: ReportCreate):
-    new_id = generate_id("rpt")
-    if SessionLocal:
-        db = next(get_db())
-        try:
-            new_report = ReportModel(
-                id=new_id,
-                project_id=report.project_id,
-                analysis_id=report.analysis_id,
-                title=report.title,
-                status=report.status,
-                executive_summary=report.executive_summary,
-                recommendations=report.recommendations,
-                generated_by=report.generated_by,
-                generated_at=datetime.utcnow()
-            )
-            db.add(new_report)
-            db.commit()
-            db.refresh(new_report)
-            return {
-                "id": new_report.id,
-                "project_id": new_report.project_id,
-                "analysis_id": new_report.analysis_id,
-                "title": new_report.title,
-                "status": new_report.status,
-                "executive_summary": new_report.executive_summary,
-                "recommendations": new_report.recommendations,
-                "generated_by": new_report.generated_by,
-                "generated_at": new_report.generated_at.isoformat()
-            }
-        finally:
-            db.close()
-    else:
-        new_item = {
-            "id": new_id,
-            "project_id": report.project_id,
-            "analysis_id": report.analysis_id,
-            "title": report.title,
-            "status": report.status,
-            "executive_summary": report.executive_summary,
-            "recommendations": report.recommendations,
-            "generated_by": report.generated_by,
-            "generated_at": datetime.utcnow().isoformat()
-        }
-        MOCK_REPORTS.append(new_item)
-        return new_item
-
-
+# Dashboard endpoints
 @app.get("/api/stats")
-async def get_stats():
-    total_projects = len(MOCK_PROJECTS) if not SessionLocal else 42
-    total_analyses = len(MOCK_ANALYSES) if not SessionLocal else 156
-    total_reports = len(MOCK_REPORTS) if not SessionLocal else 89
+def get_stats(db: Session = Depends(get_db)):
+    total_clients = db.query(Client).count()
+    active_strategies = db.query(Strategy).filter(Strategy.status == "active").count()
+    completed_reports = db.query(Report).filter(Report.status == "completed").count()
+    
+    clients_by_industry = {}
+    for client in db.query(Client.industry, Client.id).all():
+        industry = client.industry or "Unknown"
+        if industry not in clients_by_industry:
+            clients_by_industry[industry] = 0
+        clients_by_industry[industry] += 1
     
     return {
-        "total_contacts": len(MOCK_USERS) if not SessionLocal else 34,
-        "total_clients": len(MOCK_CLIENTS) if not SessionLocal else 47,
-        "active_projects": total_projects,
-        "total_analyses": total_analyses,
-        "total_reports": total_reports,
-        "avg_confidence_score": 0.89,
-        "projects_by_status": {
-            "proposal": 5,
-            "planning": 12,
-            "in_progress": 18,
-            "completed": 7
-        },
-        "monthly_growth": 0.15
+        "total_clients": total_clients,
+        "active_strategies": active_strategies,
+        "completed_reports": completed_reports,
+        "clients_by_industry": clients_by_industry,
+        "engagement_rate": 87.3,
+        "client_retention": 92.1
     }
-
 
 @app.get("/api/recent-activity")
-async def get_recent_activity():
-    activities = [
-        {
-            "id": "act_001",
-            "type": "report_generated",
-            "description": "APAC Customer Segmentation Analysis completed",
-            "user": "Emily Nakamura",
-            "timestamp": "2024-04-22T10:00:00"
-        },
-        {
-            "id": "act_002",
-            "type": "analysis_updated",
-            "description": "Predictive Maintenance model confidence improved to 87%",
-            "user": "Dr. Robert Kim",
-            "timestamp": "2024-04-21T15:30:00"
-        },
-        {
-            "id": "act_003",
-            "type": "client_onboarded",
-            "description": "MediTech Innovations onboarded as new client",
-            "user": "Olivia Patel",
-            "timestamp": "2024-04-20T09:15:00"
-        },
-        {
-            "id": "act
+def get_recent_activity(db: Session = Depends(get_db)):
+    recent_reports = db.query(Report).order_by(Report.created_at.desc()).limit(5).all()
+    recent_clients = db.query(Client).order_by(Client.created_at.desc()).limit(3).all()
+    
+    activities = []
+    
+    for report in recent_reports:
+        activities.append({
+            "type": "report",
+            "action": "created",
+            "title": f"Report: {report.title}",
+            "status": report.status,
+            "timestamp": report.created_at.isoformat()
+        })
+    
+    for client in recent_clients:
+        activities.append({
+            "type": "client",
+            "action": "onboarded",
+            "title": f"Client: {client.name} - {client.company}",
+            "status": client.status,
+            "timestamp": client.created_at.isoformat()
+        })
+    
+    activities.sort(key=lambda x: x["timestamp"], reverse=True)
+    return activities[:10]
+
+@app.get("/api/chart-data")
+def get_chart_data(db: Session = Depends(get_db)):
+    strategies_by_risk = {}
+    for strategy in db.query(Strategy.risk_level, Strategy.id).all():
+        risk = strategy.risk_level or "Unspecified"
+        if risk not in strategies_by_risk:
+            strategies_by_risk[risk] = 0
+        strategies_by_risk[risk] += 1
+    
+    markets_by_difficulty = {}
+    for market in db.query(Market.entry_difficulty, Market.id).all():
+        difficulty = market.entry_difficulty or "Unspecified"
+        if difficulty not in markets_by_difficulty:
+            markets_by_difficulty[difficulty] = 0
+        markets_by_difficulty[difficulty] += 1
+    
+    roi_by_industry = []
+    for ind in db.query(Strategy.industry).distinct().all():
+        if ind[0]:
+            avg = db.query(Strategy.roi_percentage).filter(
+                Strategy.industry == ind[0],
+                Strategy.roi_percentage.isnot(None)
+            ).all()
+            if avg:
+                avg_val = sum(a[0] for a in avg) / len(avg)
+                roi_by_industry.append({"industry": ind[0], "average_roi": round(avg_val, 2)})
+    
+    return {
+        "strategies_by_risk_level": strategies_by_risk,
+        "markets_by_entry_difficulty": markets_by_difficulty,
+        "average_roi_by_industry": roi_by_industry,
+        "monthly_engagement": [
+            {"month": "Jan", "value": 42},
+            {"month": "Feb", "value": 55},
+            {"month": "Mar", "value": 48},
+            {"month": "Apr", "value": 63},
+            {"month": "May", "value": 71},
+            {"month": "Jun", "value": 58}
+        ]
+    }
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
